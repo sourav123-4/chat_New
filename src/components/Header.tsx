@@ -9,9 +9,12 @@ import { normalize } from "../utils/orientation";
 type Props = {
   title: string;
   showBack?: boolean;
+  showProfile? : boolean;
+  showThreedot?: boolean;
+  onThreedotPress?: () => void;
 };
 
-const Header: React.FC<Props> = ({ title, showBack = false }) => {
+const Header: React.FC<Props> = ({ title, showBack = false, showProfile = true, showThreedot = false, onThreedotPress }) => {
   const navigation: any = useNavigation();
   const { profileDetailsResponse } = useAppSelector(state => state.user);
 
@@ -36,22 +39,31 @@ const Header: React.FC<Props> = ({ title, showBack = false }) => {
       {/* TITLE */}
       <Text style={styles.title}>{title}</Text>
 
-      {/* PROFILE AVATAR WITH GRADIENT RING */}
-      <TouchableOpacity
-        onPress={() => navigation.navigate("Profile")}
-        activeOpacity={0.8}
-      >
-        <LinearGradient
-          colors={["#ffffff", "#dbeafe"]}
-          style={styles.avatarGradient}
+      {/* PROFILE AVATAR WITH GRADIENT RING OR THREE-DOT MENU */}
+      {showProfile ? (
+        <TouchableOpacity
+          onPress={() => navigation.navigate("Profile")}
+          activeOpacity={0.8}
         >
-          {avatar ? (
-            <Image source={{ uri: avatar }} style={styles.avatar} />
-          ) : (
-            <FontAwesome6 name="user" iconStyle="solid" size={16} color="#555" />
-          )}
-        </LinearGradient>
-      </TouchableOpacity>
+          <LinearGradient
+            colors={["#ffffff", "#dbeafe"]}
+            style={styles.avatarGradient}
+          >
+            {avatar ? (
+              <Image source={{ uri: avatar }} style={styles.avatar} />
+            ) : (
+              <FontAwesome6 name="user" iconStyle="solid" size={16} color="#555" />
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          onPress={onThreedotPress}
+          activeOpacity={0.8}
+        >
+          <FontAwesome6 name="ellipsis-vertical" iconStyle="solid" size={20} color="#fff" />
+        </TouchableOpacity>
+      )}
       </View>
     </LinearGradient>
   );

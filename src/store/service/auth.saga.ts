@@ -13,6 +13,8 @@ import {
   resetPasswordFailure,
   changePasswordSuccess,
   changePasswordFailure,
+  googleSignInSuccess,
+  googleSignInFailure,
 } from "../slice/auth.slice";
 import { instance } from "../../utils/server/instance";
 import { API } from "../../utils/constants";
@@ -23,6 +25,8 @@ function* handleSignIn(action: {
   payload: { email: string; password: string };
 }) {
   try {
+
+    console.log("email and password==>",action.payload)
     const result: AxiosResponse<any> = yield call(
       instance.post,
       API.auth.signIn,
@@ -140,6 +144,34 @@ function* handleChangePassword(action: { type: string; payload: { oldPassword: s
   }
 }
 
+function* handleGoogleSignIn(action: { type: string; payload: { token: string } }) {
+  try {
+    const result: AxiosResponse<any> = yield call(
+      instance.post,
+      API.auth.googleSignIn,
+      action.payload
+    );
+
+    console.log("result in auth saga==>",result)
+
+    yield put(
+      result?.status === 200
+        ? googleSignInSuccess({ response: result.data })
+        : googleSignInFailure({ response: result.data })
+    );
+
+    yield call(show, "Google Sign-In Successful!", 2000, "top");
+  } catch (error: any) {
+    yield put(
+      googleSignInFailure({
+        response: error?.response?.data,
+      })
+    );
+
+    yield call(show, error?.response?.data?.message || "Google Sign-In failed", 2000, "top");
+  }
+}
+
 export default function* authSaga() {
   yield takeLatest("auth/signInRequest", handleSignIn);
   yield takeLatest("auth/signUpRequest", handleSignUp);
@@ -147,4 +179,5 @@ export default function* authSaga() {
   yield takeLatest("auth/verifyOtpRequest", handleVerifyOtp);
   yield takeLatest("auth/resetPasswordRequest", handleResetPassword);
   yield takeLatest("auth/changePasswordRequest", handleChangePassword);
+  yield takeLatest("auth/googleSignInRequest", handleGoogleSignIn);
 }

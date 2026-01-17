@@ -1,5 +1,39 @@
 import { Alert, Linking, Platform } from 'react-native';
 import ImagePicker from 'react-native-image-crop-picker';
+import ReactNativeBlobUtil from "react-native-blob-util";
+
+import { show } from '../../components/Toast';
+
+export const downloadFile = async (url: string, type: "image" | "video") => {
+  try {
+    const { fs, config } = ReactNativeBlobUtil;
+
+    const ext = type === "image" ? "jpg" : "mp4";
+    const mime = type === "image" ? "image/jpeg" : "video/mp4";
+    const fileName = `${type}_${Date.now()}.${ext}`;
+
+    const path = `${fs.dirs.DownloadDir}/${fileName}`;
+
+    await config({
+      fileCache: true,
+      addAndroidDownloads: {
+        useDownloadManager: true,
+        notification: true,
+        path,
+        mime,
+        description: `Downloading ${type}`,
+      },
+    }).fetch("GET", url);
+
+    show(`${type} downloaded successfully`);
+  } catch (e) {
+    console.log(e);
+    show(`Failed to download ${type}`);
+  }
+};
+
+
+
 
 // Define the callback type for image responses
 type ImageCallback = {

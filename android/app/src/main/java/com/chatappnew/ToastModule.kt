@@ -62,7 +62,7 @@ class ToastModule(private val reactContext: ReactApplicationContext) :
 
       val tv = TextView(reactContext).apply {
         text = message
-        setTextColor(Color.GRAY)
+        setTextColor(Color.WHITE)
         setTypeface(null, Typeface.NORMAL)
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
         gravity = Gravity.CENTER_VERTICAL

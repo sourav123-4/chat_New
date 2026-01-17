@@ -1,7 +1,7 @@
 
 // const base_url = BASE_URL;
 // const base_url = 'http://localhost:5000';
-const base_url = 'https://de7c514d43c6.ngrok-free.app'
+const base_url = 'https://66b4877ef483.ngrok-free.app'
 
 export const URL_LIST = {
   base_url: base_url,
@@ -19,6 +19,7 @@ export const API = {
   auth: {
     signUp: '/auth/signup/',
     signIn: '/auth/login/',
+    googleSignIn: '/auth/google-signin',
     forgotPassword: '/auth/forgot-password',
     verifyOtp: '/auth/verify-otp',
     resetPassword: '/auth/reset-password',
@@ -38,7 +39,3 @@ export const API = {
     searchedUsers: '/auth/search',
   }
 };
-
-// export const IMAGES_BUCKET_URL = {
-//   profile: `${BASE_URL}/uploads/users/`,
-// };

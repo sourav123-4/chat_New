@@ -149,6 +149,29 @@ const authSlice = createSlice({
       state.status = "auth/changePasswordFailure";
     },
 
+    googleSignInRequest(state) {
+      state.loading = true;
+      state.status = "auth/googleSignInRequest";
+    },
+
+    googleSignInSuccess(state, action: PayloadAction<ApiResponse>) {
+      state.loading = false;
+      state.status = "auth/googleSignInSuccess";
+
+      const data = action.payload?.response;
+
+      state.token = data?.token ?? "";
+      state.refreshToken = data?.refreshToken ?? "";
+      state.signinResponse = data ?? {};
+      state.userId = data?.user?._id ?? "";
+    },
+
+    googleSignInFailure(state, action: PayloadAction<ApiResponse>) {
+      state.loading = false;
+      state.status = "auth/googleSignInFailure";
+      state.signinResponse = action.payload?.response ?? {};
+    },
+
     setDeviceToken(state, action: PayloadAction<string>) {
       state.device_token = action.payload;
     },
@@ -182,6 +205,10 @@ export const {
   changePasswordRequest,
   changePasswordSuccess,
   changePasswordFailure,
+
+  googleSignInRequest,
+  googleSignInSuccess,
+  googleSignInFailure,
 
   setDeviceToken,
 } = authSlice.actions;

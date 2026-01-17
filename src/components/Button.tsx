@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
 
   text: {
     fontSize: normalize(16),
-    fontFamily: Fonts.Inter_SemiBold,
+    fontFamily: Fonts.Inter_Bold,
     color: "#fff",
   },
   outlineText: {

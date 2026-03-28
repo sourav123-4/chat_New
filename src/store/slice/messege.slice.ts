@@ -26,7 +26,7 @@ const messegeSlice = createSlice({
       return initialState;
     },
 
-    messegeListRequest(state) {
+    messegeListRequest(state, action: PayloadAction<any>) {
       state.loading = true;
       state.status = "messege/messegeListRequest";
     },
@@ -44,7 +44,7 @@ const messegeSlice = createSlice({
     },
 
 
-    messegeSendRequest(state) {
+    messegeSendRequest(state, action: PayloadAction<any>) {
       state.loading = true;
       state.status = "messege/messegeSendRequest";
     },

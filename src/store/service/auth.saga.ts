@@ -43,6 +43,7 @@ function* handleSignIn(action: {
 
     yield call(show, "Logged In Successfully!!", 2000, "top");
   } catch (error: any) {
+    console.log("error in psyload",error)
     yield put(
       signInFailure({
         response: error?.response?.data,

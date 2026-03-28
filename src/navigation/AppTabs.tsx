@@ -6,13 +6,11 @@ import { AppTabParamList } from "../types";
 import FontAwesome6 from "@react-native-vector-icons/fontawesome6";
 import { normalize } from "../utils/orientation";
 import ProfileScreen from "../screens/Main/ProfileScreen";
+import ScreenA from "../screens/Main/ScreenA";
 
 const Tab = createBottomTabNavigator<AppTabParamList>();
 
-// Temporary placeholder screens
-const ScreenA = () => (
-  <View style={styles.center}><Text>Screen A</Text></View>
-);
+
 
 export default function AppTabs() {
   return (

@@ -1,7 +1,6 @@
-
 // const base_url = BASE_URL;
-// const base_url = 'http://localhost:5000';
-const base_url = 'https://66b4877ef483.ngrok-free.app'
+// const base_url = 'http://localhost:8000';
+const base_url = 'https://3efc-223-185-29-176.ngrok-free.app'
 
 export const URL_LIST = {
   base_url: base_url,

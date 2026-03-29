@@ -1,5 +1,5 @@
 import { AxiosResponse } from "axios";
-import { call, put, takeLatest } from "redux-saga/effects";
+import { call, put, select, takeLatest } from "redux-saga/effects";
 import {
   signInFailure,
   signInSuccess,
@@ -19,21 +19,31 @@ import {
 import { instance } from "../../utils/server/instance";
 import { API } from "../../utils/constants";
 import { show } from "../../components/Toast";
+import { Platform } from "react-native";
+
+const getDeviceToken = (state: any) => state.auth.device_token;
 
 function* handleSignIn(action: {
   type: string;
   payload: { email: string; password: string };
 }) {
   try {
+    const deviceToken: string = yield select(getDeviceToken);
 
-    console.log("email and password==>",action.payload)
+    console.log("login details==>",{
+        ...action.payload,
+        deviceToken: deviceToken || undefined,
+        deviceType: Platform.OS,
+      })
     const result: AxiosResponse<any> = yield call(
       instance.post,
       API.auth.signIn,
-      action.payload
+      {
+        ...action.payload,
+        deviceToken: deviceToken || undefined,
+        deviceType: Platform.OS,
+      }
     );
-
-    console.log("result is ==>",result)
 
     yield put(
       result?.status === 200
@@ -43,13 +53,7 @@ function* handleSignIn(action: {
 
     yield call(show, "Logged In Successfully!!", 2000, "top");
   } catch (error: any) {
-    console.log("error in psyload",error)
-    yield put(
-      signInFailure({
-        response: error?.response?.data,
-      })
-    );
-
+    yield put(signInFailure({ response: error?.response?.data }));
     yield call(show, error?.response?.data?.message || "Login failed", 2000, "top");
   }
 }
@@ -147,13 +151,16 @@ function* handleChangePassword(action: { type: string; payload: { oldPassword: s
 
 function* handleGoogleSignIn(action: { type: string; payload: { token: string } }) {
   try {
+    const deviceToken: string = yield select(getDeviceToken);
     const result: AxiosResponse<any> = yield call(
       instance.post,
       API.auth.googleSignIn,
-      action.payload
+      {
+        ...action.payload,
+        deviceToken: deviceToken || undefined,
+        deviceType: Platform.OS,
+      }
     );
-
-    console.log("result in auth saga==>",result)
 
     yield put(
       result?.status === 200
@@ -163,12 +170,7 @@ function* handleGoogleSignIn(action: { type: string; payload: { token: string } 
 
     yield call(show, "Google Sign-In Successful!", 2000, "top");
   } catch (error: any) {
-    yield put(
-      googleSignInFailure({
-        response: error?.response?.data,
-      })
-    );
-
+    yield put(googleSignInFailure({ response: error?.response?.data }));
     yield call(show, error?.response?.data?.message || "Google Sign-In failed", 2000, "top");
   }
 }

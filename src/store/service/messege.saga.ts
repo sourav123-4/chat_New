@@ -8,10 +8,17 @@ import { messegeListFailure, messegeListSuccess, messegeSendFailure, messegeSend
 
 function* handleMessegeListRequest(action: any) {
   try {
+    const { conversationId, page, limit } = action.payload;
     const result: AxiosResponse<any> = yield call(
-      instance.get,
-      API.messege.messegeList + action.payload.chatId,
+      instance.post,
+      API.messege.messegeList,
+      {
+        conversationId,
+        page,
+        limit
+      }
     );
+    console.log("result is ==>",result)
 
     if (result?.status === 200) {
       yield put(

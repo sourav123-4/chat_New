@@ -1,21 +1,23 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { connectSocket } from '../helpers/socket';
+import { connectPusher, getChannel, releaseChannel, markMessagesRead } from '../helpers/socket';
 
 interface UseSocketProps {
   userId: string;
   chatId: string;
+  chatUserId?: string;
   onMessageReceived: (message: any) => void;
-  onMessageDelivered: (data: { messageId: string }) => void;
-  onMessageRead: (data: { messageId: string }) => void;
-  onUserOnline?: (data: { userId: string }) => void;
-  onUserOffline?: (data: { userId: string; lastSeen: number }) => void;
-  onTyping?: (data: { userId: string }) => void;
-  onStopTyping?: (data: { userId: string }) => void;
+  onMessageDelivered: (data: any) => void;
+  onMessageRead: (data: any) => void;
+  onUserOnline?: (data: any) => void;
+  onUserOffline?: (data: any) => void;
+  onTyping?: (data: any) => void;
+  onStopTyping?: (data: any) => void;
 }
 
 export const useSocket = ({
   userId,
   chatId,
+  chatUserId,
   onMessageReceived,
   onMessageDelivered,
   onMessageRead,
@@ -24,91 +26,113 @@ export const useSocket = ({
   onTyping,
   onStopTyping,
 }: UseSocketProps) => {
-  const socketRef = useRef<any>(null);
   const typingTimeoutRef = useRef<any>(null);
+  const convChannelRef = useRef<any>(null);
 
-useEffect(() => {
-  const socket = connectSocket();
-  socketRef.current = socket;
+  const r = useRef({
+    onMessageReceived, onMessageDelivered, onMessageRead,
+    onUserOnline, onUserOffline, onTyping, onStopTyping,
+  });
+  useEffect(() => {
+    r.current = {
+      onMessageReceived, onMessageDelivered, onMessageRead,
+      onUserOnline, onUserOffline, onTyping, onStopTyping,
+    };
+  });
 
-  socket.emit('setup', userId);
-  socket.emit('join_conversation', chatId);
+  useEffect(() => {
+    const convName = `private-conversation-${chatId}`;
+    const globalName = 'presence-global';
 
-  socket.on('message_received', onMessageReceived);
-  socket.on('message_delivered', onMessageDelivered);
-  socket.on('message_read', onMessageRead);
+    const convChannel = getChannel(convName);
+    convChannelRef.current = convChannel;
+    const globalChannel = getChannel(globalName);
 
-  if (onUserOnline) socket.on('user_online', onUserOnline);
-  if (onUserOffline) socket.on('user_offline', onUserOffline);
-  if (onTyping) socket.on('typing', onTyping);
-  if (onStopTyping) socket.on('stop_typing', onStopTyping);
+    // ── Messages ──────────────────────────────────────────────────
+    const onMsgReceived = (msg: any) => {
+      const sid = typeof msg.senderId === 'object' ? msg.senderId._id : msg.senderId;
+      if (sid === userId) return;
+      r.current.onMessageReceived(msg);
+    };
 
-  return () => {
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
+    const onMsgDelivered = (d: any) => {
+      // backend may send { messageId } or full message object
+      const messageId = d?.messageId ?? d?._id;
+      r.current.onMessageDelivered({ messageId });
+    };
 
-    socket.emit('stop_typing', { conversationId: chatId });
-    socket.emit('leave_conversation', chatId);
+    // client-message_read: instant read receipt via Pusher client event
+    const onMsgRead = (d: any) => {
+      if (d?.userId === userId) return; // ignore own
+      r.current.onMessageRead(d);
+    };
 
-    socket.off('message_received', onMessageReceived);
-    socket.off('message_delivered', onMessageDelivered);
-    socket.off('message_read', onMessageRead);
+    convChannel.bind('message_received', onMsgReceived);
+    convChannel.bind('message_delivered', onMsgDelivered);
+    convChannel.bind('client-message_read', onMsgRead);
 
-    if (onUserOnline) socket.off('user_online', onUserOnline);
-    if (onUserOffline) socket.off('user_offline', onUserOffline);
-    if (onTyping) socket.off('typing', onTyping);
-    if (onStopTyping) socket.off('stop_typing', onStopTyping);
+    // ── Typing ────────────────────────────────────────────────────
+    const onTypingEvt = (d: any) => {
+      if (d?.userId === userId) return;
+      r.current.onTyping?.(d);
+    };
+    const onStopTypingEvt = (d: any) => {
+      if (d?.userId === userId) return;
+      r.current.onStopTyping?.(d);
+    };
+    convChannel.bind('client-typing', onTypingEvt);
+    convChannel.bind('client-stop_typing', onStopTypingEvt);
 
-    socket.disconnect();
-  };
-}, [
-  chatId,
-  userId,
-  onMessageReceived,
-  onMessageDelivered,
-  onMessageRead,
-  onUserOnline,
-  onUserOffline,
-  onTyping,
-  onStopTyping,
-]);
+    // ── Online / Offline ──────────────────────────────────────────
+    const onOnline = (d: any) => {
+      if (d?.userId === chatUserId) r.current.onUserOnline?.(d);
+    };
+    const onOffline = (d: any) => {
+      if (d?.userId === chatUserId) r.current.onUserOffline?.(d);
+    };
+    globalChannel.bind('user_online', onOnline);
+    globalChannel.bind('user_offline', onOffline);
 
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      convChannel.unbind('message_received', onMsgReceived);
+      convChannel.unbind('message_delivered', onMsgDelivered);
+      convChannel.unbind('client-message_read', onMsgRead);
+      convChannel.unbind('client-typing', onTypingEvt);
+      convChannel.unbind('client-stop_typing', onStopTypingEvt);
+      releaseChannel(convName);
+      globalChannel.unbind('user_online', onOnline);
+      globalChannel.unbind('user_offline', onOffline);
+      releaseChannel(globalName);
+      convChannelRef.current = null;
+    };
+  }, [chatId, userId, chatUserId]);
 
   const emitTyping = useCallback(() => {
-    if (!socketRef.current) return;
-    socketRef.current.emit('typing', { conversationId: chatId, userId });
-  }, [chatId, userId]);
+    convChannelRef.current?.trigger('client-typing', { userId });
+  }, [userId]);
 
   const emitStopTyping = useCallback(() => {
-    if (!socketRef.current) return;
-    socketRef.current.emit('stop_typing', { conversationId: chatId, userId });
-  }, [chatId, userId]);
+    convChannelRef.current?.trigger('client-stop_typing', { userId });
+  }, [userId]);
 
-  const emitMessageRead = useCallback((messageId: string) => {
-    if (!socketRef.current) return;
-    socketRef.current.emit('message_read', { messageId, conversationId: chatId });
-  }, [chatId]);
+  // Instant read receipt — client event + backend API call
+  const emitMessageRead = useCallback(() => {
+    // 1. Instant: tell the other user via Pusher client event
+    convChannelRef.current?.trigger('client-message_read', { userId, conversationId: chatId });
+    // 2. Persist: update DB via API
+    markMessagesRead(chatId);
+  }, [userId, chatId]);
 
-  const handleTypingWithTimeout = useCallback((callback: () => void) => {
-    emitTyping();
-    
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    
-    typingTimeoutRef.current = setTimeout(() => {
-      emitStopTyping();
-    }, 1000);
-    
-    callback();
-  }, [emitTyping, emitStopTyping]);
+  const handleTypingWithTimeout = useCallback(
+    (callback: () => void) => {
+      emitTyping();
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(emitStopTyping, 2000);
+      callback();
+    },
+    [emitTyping, emitStopTyping]
+  );
 
-  return {
-    socket: socketRef.current,
-    emitTyping,
-    emitStopTyping,
-    emitMessageRead,
-    handleTypingWithTimeout,
-  };
+  return { emitTyping, emitStopTyping, emitMessageRead, handleTypingWithTimeout };
 };

@@ -24,6 +24,7 @@ import { normalize } from "../../utils/orientation";
 import Button from "../../components/Button";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "../../themes";
+import { ProfileSkeleton } from "../../components/SkeletonLoader";
 
 type Props = NativeStackScreenProps<AppStackParamList, "Profile">;
 
@@ -66,17 +67,15 @@ export default function ProfileScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-      <LinearGradient colors={["#6A11CB", "#2575FC"]} style={styles.gradient} />
+      {/* <LinearGradient colors={["#6A11CB", "#2575FC"]} style={styles.gradient} /> */}
 
       <Header showBack={false} title="Profile" />
 
+      {/* <ProfileSkeleton/> */}
       {loading ? (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#6A11CB" />
-        </View>
+        <ProfileSkeleton />
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Avatar Section */}
           <View style={styles.avatarSection}>
             {avatarUri ? (
               <Image
@@ -90,9 +89,7 @@ export default function ProfileScreen({ navigation }: Props) {
             )}
           </View>
 
-          {/* User Info Card */}
           <View style={styles.card}>
-            {/* Name */}
             <View style={styles.infoRow}>
               <FontAwesome6 name="user" size={16} color="#6A11CB" />
               <View style={styles.infoContent}>
@@ -103,7 +100,6 @@ export default function ProfileScreen({ navigation }: Props) {
               </View>
             </View>
 
-            {/* Email */}
             <View style={[styles.infoRow, { marginTop: normalize(14) }]}>
               <FontAwesome6 name="envelope" size={16} color="#6A11CB" />
               <View style={styles.infoContent}>
@@ -114,7 +110,6 @@ export default function ProfileScreen({ navigation }: Props) {
               </View>
             </View>
 
-            {/* Created Date */}
             <View style={[styles.infoRow, { marginTop: normalize(14) }]}>
               <FontAwesome6 name="calendar" size={16} color="#6A11CB" />
               <View style={styles.infoContent}>
@@ -128,7 +123,6 @@ export default function ProfileScreen({ navigation }: Props) {
             </View>
           </View>
 
-          {/* Action Buttons */}
           <View style={styles.buttonGroup}>
             <Button
               title="Edit Profile"

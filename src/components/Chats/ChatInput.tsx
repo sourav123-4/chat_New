@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { normalize } from '../../utils/orientation';
-import { Colors } from '../../themes';
+import FontAwesome6 from '@react-native-vector-icons/fontawesome6';
 
 interface ChatInputProps {
   value: string;
@@ -20,26 +20,30 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 }) => {
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={onImagePress}>
-        <Text style={styles.icon}>📷</Text>
+      <TouchableOpacity onPress={onImagePress} style={styles.iconBtn}>
+        <FontAwesome6 name="image" iconStyle="solid" size={normalize(20)} color="#6A11CB" />
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={onVideoPress}>
-        <Text style={styles.icon}>🎥</Text>
+      <TouchableOpacity onPress={onVideoPress} style={styles.iconBtn}>
+        <FontAwesome6 name="video" iconStyle="solid" size={normalize(20)} color="#6A11CB" />
       </TouchableOpacity>
 
       <TextInput
         value={value}
         onChangeText={onChangeText}
-        placeholder="Type a message"
+        placeholder="Type a message..."
         style={styles.input}
-        placeholderTextColor={Colors.gray}
+        placeholderTextColor="#aaa"
         multiline
         maxLength={1000}
       />
 
-      <TouchableOpacity onPress={onSend} style={styles.sendBtn}>
-        <Text style={styles.sendText}>Send</Text>
+      <TouchableOpacity
+        onPress={onSend}
+        style={[styles.sendBtn, !value.trim() && styles.sendBtnDisabled]}
+        disabled={!value.trim()}
+      >
+        <FontAwesome6 name="paper-plane" iconStyle="solid" size={normalize(16)} color="#fff" />
       </TouchableOpacity>
     </View>
   );
@@ -48,43 +52,48 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    padding: normalize(12),
-    backgroundColor: '#fff',
     alignItems: 'center',
+    paddingHorizontal: normalize(10),
+    paddingVertical: normalize(8),
+    backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    gap: normalize(8),
+    borderTopColor: '#F0F0F0',
+    gap: normalize(6),
+  },
+  iconBtn: {
+    width: normalize(36),
+    height: normalize(36),
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   input: {
     flex: 1,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderRadius: 24,
-    paddingHorizontal: normalize(16),
-    paddingVertical: normalize(10),
+    borderRadius: normalize(22),
+    paddingHorizontal: normalize(14),
+    paddingVertical: normalize(8),
     fontSize: normalize(14),
     color: '#111',
-    backgroundColor: '#f9f9f9',
-    maxHeight: 100,
+    backgroundColor: '#F8F9FA',
+    maxHeight: normalize(100),
   },
   sendBtn: {
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
     backgroundColor: '#6A11CB',
-    paddingHorizontal: normalize(20),
-    paddingVertical: normalize(10),
-    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#6A11CB',
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.35,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
-  sendText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  icon: {
-    fontSize: normalize(24),
+  sendBtnDisabled: {
+    backgroundColor: '#C4B5FD',
+    shadowOpacity: 0,
+    elevation: 0,
   },
 });

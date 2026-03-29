@@ -7,17 +7,16 @@ export type AuthStackParamList = {
   ResetPassword: { email: string; otp: string };
 };
 
-// TABS (Home + 2 placeholders)
+// TABS
 export type AppTabParamList = {
   Home: undefined;
-  Chats: undefined;
   Profile: undefined;
 };
 
 // ROOT APP STACK (Tabs + Chat + Profile)
 export type AppStackParamList = {
   Tabs: undefined;
-  Chat: { chatId: string, chatUser: any };
+  Chat: { chatId: string; chatUser: any; isGroupChat: boolean; groupName?: string };
   AddFriends: undefined;
   Profile: undefined;
   EditProfile: undefined;

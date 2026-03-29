@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { normalize } from '../../utils/orientation';
+import { TickIcon } from '../TickIcon';
 
 interface MessageBubbleProps {
   message: any;
@@ -39,16 +40,18 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const renderMessageFooter = () => (
     <View style={styles.messageFooter}>
       {message.status === 'sending' ? (
-        <Text style={styles.sendingText}>Sending...</Text>
+        <Text style={styles.sendingText}>sending</Text>
       ) : (
-        <Text
-          style={[
-            styles.timestamp,
-            isMyMessage ? styles.myTimestamp : styles.otherTimestamp,
-          ]}
-        >
-          {timestamp}
-        </Text>
+        <>
+          <Text style={[styles.timestamp, isMyMessage ? styles.myTimestamp : styles.otherTimestamp]}>
+            {timestamp}
+          </Text>
+          {isMyMessage && (
+            <View style={styles.tickWrap}>
+              <TickIcon status={message.status} theme="light" />
+            </View>
+          )}
+        </>
       )}
     </View>
   );
@@ -233,13 +236,18 @@ const styles = StyleSheet.create({
   },
   sendingText: {
     fontSize: normalize(11),
-    color: '#aaa',
+    color: 'rgba(255,255,255,0.6)',
+    fontStyle: 'italic',
   },
   messageFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
     marginTop: normalize(2),
+    gap: normalize(4),
+  },
+  tickWrap: {
+    marginLeft: normalize(2),
   },
   image: {
     width: normalize(200),

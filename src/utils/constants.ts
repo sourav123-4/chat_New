@@ -1,6 +1,6 @@
-// const base_url = BASE_URL;
-// const base_url = 'http://localhost:8000';
-const base_url = 'https://3efc-223-185-29-176.ngrok-free.app'
+import { BASE_URL } from "@env";
+
+const base_url = BASE_URL;
 
 export const URL_LIST = {
   base_url: base_url,
@@ -29,8 +29,9 @@ export const API = {
     chatCreate: '/chats/create',
   },
   messege:{
-    messegeList: '/messages/',
+    messegeList: '/messages/list',
     messegecreate: '/messages/send',
+    messegeRead: '/messages/read',
   },
   user:{
     profile: '/auth/profile/',

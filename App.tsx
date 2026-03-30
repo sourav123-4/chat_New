@@ -16,6 +16,7 @@ import {
   getInitialNotification,
 } from "./src/utils/helpers/NotificationService";
 import { notifyOnline, notifyOffline, disconnectPusher } from "./src/utils/helpers/socket";
+import { getDB } from "./src/db/sqlite";
 
 function Routes() {
   const { token } = useAppSelector(state => state.auth);
@@ -23,6 +24,7 @@ function Routes() {
 
   useEffect(() => {
     configureGoogleSignIn();
+    getDB(); // Initialize SQLite schema on app start
   }, []);
 
   useEffect(() => {

@@ -25,6 +25,8 @@ import Button from "../../components/Button";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "../../themes";
 import { ProfileSkeleton } from "../../components/SkeletonLoader";
+import { clearAllMMKV } from "../../db/mmkv";
+import { clearAllMessages } from "../../db/messageRepository";
 
 type Props = NativeStackScreenProps<AppStackParamList, "Profile">;
 
@@ -55,12 +57,14 @@ export default function ProfileScreen({ navigation }: Props) {
 
   const logout = async () => {
     try {
+      clearAllMMKV();
+      clearAllMessages();
       await Storage.clearAll();
       dispatch(resetAuth());
       dispatch(resetUser());
-      show("Logged out successfully", 2000, "top");
+      show('Logged out successfully', 2000, 'top');
     } catch (error) {
-      show("Logout failed", 2000, "top");
+      show('Logout failed', 2000, 'top');
     }
   };
 

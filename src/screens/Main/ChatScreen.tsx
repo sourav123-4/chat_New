@@ -9,6 +9,8 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../types';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { messegeListRequest, messegeSendRequest } from '../../store/slice/messege.slice';
+import { startOutgoingCall } from '../../store/slice/call.slice';
+import { fetchAgoraToken, generateChannelName, generateUID, requestCallPermissions, initiateCall } from '../../utils/helpers/agora';
 import { normalize } from '../../utils/orientation';
 import { downloadFile } from '../../utils/helpers';
 import { DateHeader } from '../../components/Chats/DateHeader';
@@ -168,14 +170,23 @@ export default function ChatScreen({ route, navigation }: Props) {
       setMessagesFetchedAt(chatId);
     });
 
-    // Update UI — API returns oldest-first, reverse for inverted FlatList
     const reversed = [...incoming].reverse();
+
     if (messegeListResponse.page === 1) {
-      setMessages(reversed);
+      setMessages((prev) => {
+        if (prev.length === 0) return reversed;
+        // Merge: keep existing messages, add any new ones from API
+        const existingIds = new Set(prev.map((m: any) => m._id));
+        const newOnes = reversed.filter((m: any) => !existingIds.has(m._id));
+        if (newOnes.length === 0) return prev; // nothing changed, no re-render
+        return [...newOnes, ...prev];
+      });
     } else {
       setMessages((prev) => {
         const ids = new Set(prev.map((m: any) => m._id));
-        return [...prev, ...reversed.filter((m: any) => !ids.has(m._id))];
+        const newOnes = reversed.filter((m: any) => !ids.has(m._id));
+        if (newOnes.length === 0) return prev;
+        return [...prev, ...newOnes];
       });
     }
     setLoading(false);
@@ -283,23 +294,69 @@ export default function ChatScreen({ route, navigation }: Props) {
     }
   }, [createTempMessage, chatId, dispatch, requestMediaPermission]);
 
+  const startCall = useCallback(async (callType: 'audio' | 'video') => {
+    const hasPermission = await requestCallPermissions(callType === 'video');
+    console.log("has permission==>",hasPermission)
+    if (!hasPermission) return;
+
+    const channelName = generateChannelName(chatId);
+    const uid = generateUID(userId);
+    const agoraToken = await fetchAgoraToken(channelName, uid);
+    console.log("agora token==>",agoraToken)
+    if (!agoraToken) return;
+
+    // Show outgoing call screen immediately
+    dispatch(startOutgoingCall({
+      callType,
+      channelName,
+      token: agoraToken,
+      uid,
+      conversationId: chatId,
+      remoteUser: chatUser ? {
+        _id: chatUser._id,
+        name: chatUser.name || chatUser.email,
+        avatar: chatUser.avatar,
+      } : null,
+      isGroup: isGroupChat,
+      groupName,
+    }));
+
+    // Notify the other user via FCM push
+    if (chatUser?._id) {
+      await initiateCall({
+        receiverId: chatUser._id,
+        channelName,
+        agoraToken,
+        uid,
+        callType,
+        isGroup: isGroupChat,
+        groupName,
+        conversationId: chatId,
+      });
+    }
+  }, [userId, chatId, chatUser, isGroupChat, groupName, dispatch]);
+
   const isNewDay = useCallback((current: any, previous?: any) => {
     if (!previous) return true;
     return new Date(current.createdAt).toDateString() !== new Date(previous.createdAt).toDateString();
   }, []);
 
   const renderItem = useCallback(({ item, index }: any) => {
-    const showDateHeader = isNewDay(item, messages[index + 1]);
     const isMe = isMyMessage(item);
+    // In inverted FlatList: index+1 is the message ABOVE (older)
+    // Show date header BETWEEN this message and the one above
+    // Render it AFTER the bubble so it appears ABOVE in inverted
+    const nextMsg = messages[index + 1]; // older message above
+    const showDateHeader = isNewDay(item, nextMsg);
     return (
       <>
-        {showDateHeader && <DateHeader date={item.createdAt} />}
         <View style={[styles.messageWrapper, isMe ? styles.myWrapper : styles.otherWrapper]}>
           <MessageBubble
             message={item} isMyMessage={isMe} isGroupChat={isGroupChat}
             onImagePress={setViewImageUrl} onVideoPress={setPlayVideoUrl} onDownload={downloadFile}
           />
         </View>
+        {showDateHeader && <DateHeader date={item.createdAt} />}
       </>
     );
   }, [messages, isNewDay, isMyMessage, isGroupChat]);
@@ -334,6 +391,17 @@ export default function ChatScreen({ route, navigation }: Props) {
             <Text style={[styles.headerStatus, isTyping && styles.headerTyping]}>{statusText}</Text>
           ) : null}
         </View>
+        {/* Call buttons */}
+        {!isGroupChat && (
+          <View style={styles.headerActions}>
+            <TouchableOpacity onPress={() => startCall('audio')} style={styles.headerActionBtn}>
+              <FontAwesome6 name="phone" iconStyle="solid" size={normalize(18)} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => startCall('video')} style={styles.headerActionBtn}>
+              <FontAwesome6 name="video" iconStyle="solid" size={normalize(18)} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        )}
       </LinearGradient>
 
       <KeyboardAvoidingView style={styles.flex1} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -402,6 +470,8 @@ const styles = StyleSheet.create({
   headerName: { fontSize: normalize(16), fontWeight: '600', color: '#fff' },
   headerStatus: { fontSize: normalize(12), color: 'rgba(255,255,255,0.75)', marginTop: 1 },
   headerTyping: { color: '#A5F3FC' },
+  headerActions: { flexDirection: 'row', gap: normalize(8) },
+  headerActionBtn: { padding: normalize(6) },
   listContent: { paddingHorizontal: normalize(12), paddingVertical: normalize(8), flexGrow: 1 },
   messageWrapper: { marginVertical: normalize(3), paddingHorizontal: normalize(4) },
   myWrapper: { alignItems: 'flex-end' },

@@ -34,11 +34,11 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>This app needs access to your camera so you can take a profile photo.</string>
+	<string>Camera access is needed for video calls and profile photos.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>This app needs access to your microphone when recording videos.</string>
+	<string>Microphone access is needed for audio and video calls.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app needs access to your photos to let you choose and upload a picture.</string>
 	<key>RCTNewArchEnabled</key>

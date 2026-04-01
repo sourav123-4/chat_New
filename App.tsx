@@ -14,9 +14,11 @@ import {
   listenForegroundNotification,
   onNotificationOpened,
   getInitialNotification,
+  dispatchIncomingCall,
 } from "./src/utils/helpers/NotificationService";
 import { notifyOnline, notifyOffline, disconnectPusher } from "./src/utils/helpers/socket";
 import { getDB } from "./src/db/sqlite";
+import CallOverlay from "./src/components/CallOverlay";
 
 function Routes() {
   const { token } = useAppSelector(state => state.auth);
@@ -35,15 +37,22 @@ function Routes() {
     };
     setup();
     const unsubscribeForeground = listenForegroundNotification();
-    onNotificationOpened(data => {
-      console.log("Opened from background:", data);
+
+    // Handle notification tap from background
+    onNotificationOpened((data) => {
+      if (data?.type === 'incoming_call') {
+        dispatchIncomingCall(data);
+      }
     });
-    getInitialNotification(data => {
-      console.log("Opened from killed state:", data);
+
+    // Handle notification tap from killed state
+    getInitialNotification((data) => {
+      if (data?.type === 'incoming_call') {
+        dispatchIncomingCall(data);
+      }
     });
-    return () => {
-      unsubscribeForeground();
-    };
+
+    return () => unsubscribeForeground();
   }, []);
 
   // Online / offline based on app foreground state
@@ -81,6 +90,7 @@ export default function App() {
       <SafeAreaProvider>
         <NavigationContainer>
           <Routes />
+          <CallOverlay />
         </NavigationContainer>
       </SafeAreaProvider>
     </Provider>

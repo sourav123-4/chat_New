@@ -6,6 +6,7 @@ import authReducer from './slice/auth.slice';
 import userReducer from './slice/user.slice';
 import chatReducer from './slice/chat.slice';
 import messegeReducer from './slice/messege.slice';
+import callReducer from './slice/call.slice';
 import rootSaga from './service/rootSaga'; 
 import Storage from '../utils/storage';
 
@@ -16,6 +17,7 @@ const appReducer = combineReducers({
   user: userReducer,
   chat: chatReducer,
   messege: messegeReducer,
+  call: callReducer,
 });
 
 const rootReducer = (state: any, action: any) => {

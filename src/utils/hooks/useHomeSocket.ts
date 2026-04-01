@@ -37,7 +37,7 @@ export const useHomeSocket = ({
     globalChannel.bind('user_offline', onOffline);
 
     // ── per-conversation: messages + typing ──────────────────────
-    const convBindings: { name: string; ch: any; msgHandler: any; typingHandler: any; stopTypingHandler: any }[] = [];
+    const convBindings: { name: string; ch: any; msgHandler: any; typingHandler: any; stopTypingHandler: any; readHandler: any }[] = [];
 
     chatIds.forEach((chatId) => {
       const name = `private-conversation-${chatId}`;

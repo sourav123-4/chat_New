@@ -42,14 +42,14 @@ export const generateChannelName = (chatId: string): string => {
   return `call_${chatId}_${Date.now()}`;
 };
 
-// Generate a numeric UID from userId string
+// Generate a numeric UID from userId string — guaranteed non-zero
 export const generateUID = (userId: string): number => {
   let hash = 0;
   for (let i = 0; i < userId.length; i++) {
     hash = (hash << 5) - hash + userId.charCodeAt(i);
     hash |= 0;
   }
-  return Math.abs(hash) % 100000;
+  return (Math.abs(hash) % 99999) + 1; // 1–99999, never 0
 };
 
 // Notify the other user about the call via backend (sends FCM push)
@@ -57,7 +57,9 @@ export const initiateCall = async (params: {
   receiverId: string;
   channelName: string;
   agoraToken: string;
-  uid: number;
+  uid: number;        // caller's UID
+  receiverUid: number; // receiver's UID (different from caller)
+  receiverToken: string; // token generated for receiver's UID
   callType: 'audio' | 'video';
   isGroup?: boolean;
   groupName?: string;
@@ -68,8 +70,8 @@ export const initiateCall = async (params: {
     const body = {
       receiverId: params.receiverId,
       channelName: params.channelName,
-      token: params.agoraToken,
-      uid: params.uid,
+      token: params.receiverToken,  // receiver gets their own token
+      uid: params.receiverUid,      // receiver gets their own UID
       callType: params.callType,
       isGroup: params.isGroup ?? false,
       groupName: params.groupName ?? '',

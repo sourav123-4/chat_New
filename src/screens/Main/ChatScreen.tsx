@@ -296,21 +296,25 @@ export default function ChatScreen({ route, navigation }: Props) {
 
   const startCall = useCallback(async (callType: 'audio' | 'video') => {
     const hasPermission = await requestCallPermissions(callType === 'video');
-    console.log("has permission==>",hasPermission)
     if (!hasPermission) return;
 
     const channelName = generateChannelName(chatId);
-    const uid = generateUID(userId);
-    const agoraToken = await fetchAgoraToken(channelName, uid);
-    console.log("agora token==>",agoraToken)
-    if (!agoraToken) return;
+    const callerUid = generateUID(userId);
+    const receiverUid = generateUID(chatUser?._id ?? 'receiver'); // different UID
 
-    // Show outgoing call screen immediately
+    // Fetch tokens for both caller and receiver
+    const callerToken = await fetchAgoraToken(channelName, callerUid);
+    if (!callerToken) return;
+    const receiverToken = await fetchAgoraToken(channelName, receiverUid);
+    if (!receiverToken) return;
+
+    console.log('[startCall] callerUid:', callerUid, 'receiverUid:', receiverUid);
+
     dispatch(startOutgoingCall({
       callType,
       channelName,
-      token: agoraToken,
-      uid,
+      token: callerToken,
+      uid: callerUid,
       conversationId: chatId,
       remoteUser: chatUser ? {
         _id: chatUser._id,
@@ -321,13 +325,14 @@ export default function ChatScreen({ route, navigation }: Props) {
       groupName,
     }));
 
-    // Notify the other user via FCM push
     if (chatUser?._id) {
       await initiateCall({
         receiverId: chatUser._id,
         channelName,
-        agoraToken,
-        uid,
+        agoraToken: callerToken,
+        uid: callerUid,
+        receiverUid,
+        receiverToken,
         callType,
         isGroup: isGroupChat,
         groupName,

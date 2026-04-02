@@ -6,14 +6,26 @@ import { useAppDispatch, useAppSelector } from '../../store';
 import { endCall, callConnected } from '../../store/slice/call.slice';
 import { normalize } from '../../utils/orientation';
 import LinearGradient from 'react-native-linear-gradient';
-import { getChannel, releaseChannel, connectPusher } from '../../utils/helpers/socket';
+import { signalCall, extractConversationId } from '../../utils/helpers/socket';
 
 export default function IncomingCallScreen() {
   const dispatch = useAppDispatch();
-  const { remoteUser, callType, isGroup, groupName, channelName, conversationId } = useAppSelector((s) => s.call);
+  const { remoteUser, callType, isGroup, groupName, channelName, conversationId, autoAccepted } =
+    useAppSelector((s) => s.call);
   const slideAnim = useRef(new Animated.Value(0)).current;
 
+  // Use conversationId from Redux, or extract it from channelName as fallback
+  const resolvedConversationId = conversationId || extractConversationId(channelName ?? '');
+
   useEffect(() => {
+    // If accepted from notification action button, skip the screen and go active
+    if (autoAccepted) {
+      console.log('[IncomingCall] autoAccepted — going straight to active');
+      Vibration.cancel();
+      dispatch(callConnected());
+      return;
+    }
+
     Vibration.vibrate([500, 1000, 500, 1000], true);
     Animated.loop(
       Animated.sequence([
@@ -23,34 +35,38 @@ export default function IncomingCallScreen() {
       ])
     ).start();
     return () => Vibration.cancel();
-  }, []);
+  }, [autoAccepted]);
 
-  const handleDecline = () => {
-    // Notify caller instantly via Pusher client event
-    if (conversationId) {
+  const handleDecline = async () => {
+    Vibration.cancel();
+    console.log('[IncomingCall] Decline — resolvedConversationId:', resolvedConversationId, 'channelName:', channelName);
+    if (resolvedConversationId && channelName) {
       try {
-        const pusher = connectPusher();
-        const chName = `private-conversation-${conversationId}`;
-        // Get existing channel or subscribe
-        let ch = pusher.channel(chName);
-        if (ch && (ch as any).subscribed) {
-          ch.trigger('client-call_declined', { channelName });
-        } else {
-          // Subscribe and trigger once ready
-          ch = pusher.subscribe(chName);
-          ch.bind('pusher:subscription_succeeded', () => {
-            ch.trigger('client-call_declined', { channelName });
-          });
-        }
-      } catch {}
+        const res = await signalCall(resolvedConversationId, 'declined', channelName);
+        console.log('[IncomingCall] signalCall declined status:', res.status);
+      } catch (e) {
+        console.error('[IncomingCall] signalCall declined error:', e);
+      }
     }
     dispatch(endCall());
   };
 
-  const handleAccept = () => {
+  const handleAccept = async () => {
     Vibration.cancel();
+    console.log('[IncomingCall] Accept — resolvedConversationId:', resolvedConversationId, 'channelName:', channelName);
+    if (resolvedConversationId && channelName) {
+      try {
+        const res = await signalCall(resolvedConversationId, 'accepted', channelName);
+        console.log('[IncomingCall] signalCall accepted status:', res.status);
+      } catch (e) {
+        console.error('[IncomingCall] signalCall accepted error:', e);
+      }
+    }
     dispatch(callConnected());
   };
+
+  // Don't render if autoAccepted (will transition immediately)
+  if (autoAccepted) return null;
 
   const name = isGroup ? groupName || 'Group Call' : remoteUser?.name || 'Unknown';
   const avatar = !isGroup ? remoteUser?.avatar : null;
@@ -75,7 +91,6 @@ export default function IncomingCallScreen() {
         <Text style={styles.name}>{name}</Text>
 
         <View style={styles.actions}>
-          {/* Decline */}
           <View style={styles.actionWrap}>
             <TouchableOpacity style={[styles.actionBtn, styles.declineBtn]} onPress={handleDecline}>
               <FontAwesome6 name="phone-slash" iconStyle="solid" size={normalize(28)} color="#fff" />
@@ -83,7 +98,6 @@ export default function IncomingCallScreen() {
             <Text style={styles.actionLabel}>Decline</Text>
           </View>
 
-          {/* Accept */}
           <View style={styles.actionWrap}>
             <TouchableOpacity style={[styles.actionBtn, styles.acceptBtn]} onPress={handleAccept}>
               <FontAwesome6

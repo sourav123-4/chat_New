@@ -9,23 +9,39 @@ import {
   ChannelProfileType,
   ClientRoleType,
   VideoSourceType,
+  RenderModeType,
+  RtcConnection,
+  UserOfflineReasonType,
 } from 'react-native-agora';
 import { useAppDispatch, useAppSelector } from '../../store';
-import {
-  endCall, toggleMute, toggleSpeaker, toggleCamera,
-} from '../../store/slice/call.slice';
+import { endCall, toggleMute, toggleSpeaker, toggleCamera } from '../../store/slice/call.slice';
 import { normalize } from '../../utils/orientation';
 import { AGORA_APP_ID_VALUE } from '../../utils/helpers/agora';
+import { signalCall, extractConversationId, connectPusher } from '../../utils/helpers/socket';
 import LinearGradient from 'react-native-linear-gradient';
 
 export default function ActiveCallScreen() {
   const dispatch = useAppDispatch();
-  const { callType, channelName, token, uid, remoteUser, isGroup, groupName,
-    isMuted, isSpeakerOn, isCameraOff, callStartedAt } = useAppSelector((s) => s.call);
+  const {
+    callType, channelName, token, uid,
+    remoteUser, isGroup, groupName,
+    isMuted, isSpeakerOn, isCameraOff,
+    callStartedAt, conversationId,
+  } = useAppSelector((s) => s.call);
 
   const engine = useRef<IRtcEngine | null>(null);
-  const [remoteUids, setRemoteUids] = useState<number[]>([]);
+  const [remoteUid, setRemoteUid] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [engineReady, setEngineReady] = useState(false);
+
+  const isVideo = callType === 'video';
+  const resolvedConversationId = conversationId || extractConversationId(channelName ?? '');
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60).toString().padStart(2, '0');
+    const sec = (s % 60).toString().padStart(2, '0');
+    return `${m}:${sec}`;
+  };
 
   // Timer
   useEffect(() => {
@@ -35,102 +51,163 @@ export default function ActiveCallScreen() {
     return () => clearInterval(interval);
   }, [callStartedAt]);
 
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60).toString().padStart(2, '0');
-    const sec = (s % 60).toString().padStart(2, '0');
-    return `${m}:${sec}`;
-  };
-
-  // Init Agora
+  // Phase 1: init engine, register handlers, enable media, startPreview
   useEffect(() => {
-    const init = async () => {
-      engine.current = createAgoraRtcEngine();
-      engine.current.initialize({ appId: AGORA_APP_ID_VALUE });
+    const eng = createAgoraRtcEngine();
+    engine.current = eng;
 
-      engine.current.registerEventHandler({
-        onUserJoined: (_, remoteUid) => {
-          setRemoteUids((prev) => [...new Set([...prev, remoteUid])]);
-        },
-        onUserOffline: (_, remoteUid) => {
-          setRemoteUids((prev) => prev.filter((id) => id !== remoteUid));
-        },
-        onLeaveChannel: () => {
-          dispatch(endCall());
-        },
-      });
+    eng.initialize({ appId: AGORA_APP_ID_VALUE });
+    eng.setChannelProfile(ChannelProfileType.ChannelProfileCommunication);
 
-      if (callType === 'video') {
-        engine.current.enableVideo();
-        engine.current.startPreview();
-      } else {
-        engine.current.enableAudio();
-      }
+    eng.registerEventHandler({
+      onJoinChannelSuccess: (_connection: RtcConnection, _elapsed: number) => {
+        console.log('[Agora] joined channel successfully');
+        eng.setEnableSpeakerphone(true);
+      },
+      onUserJoined: (_connection: RtcConnection, rUid: number, _elapsed: number) => {
+        console.log('[Agora] remote user joined:', rUid);
+        setRemoteUid(rUid);
+      },
+      onUserOffline: (_connection: RtcConnection, rUid: number, _reason: UserOfflineReasonType) => {
+        console.log('[Agora] remote user offline:', rUid);
+        setRemoteUid(null);
+        dispatch(endCall());
+      },
+      onError: (err: number, msg: string) => {
+        console.log('[Agora] error:', err, msg);
+      },
+    });
 
-      engine.current.setChannelProfile(ChannelProfileType.ChannelProfileCommunication);
-      await engine.current.joinChannel(token ?? '', channelName ?? '', uid ?? 0, {
-        clientRoleType: ClientRoleType.ClientRoleBroadcaster,
-      });
-    };
+    if (isVideo) {
+      eng.enableVideo();
+      eng.enableAudio();
+      eng.startPreview();
+    } else {
+      eng.enableAudio();
+    }
 
-    init();
+    // Signal React to mount the RtcSurfaceViews
+    setEngineReady(true);
 
     return () => {
-      engine.current?.leaveChannel();
-      engine.current?.release();
+      eng.leaveChannel();
+      eng.release();
       engine.current = null;
     };
   }, []);
+
+  // Phase 2: join AFTER views are mounted in DOM
+  useEffect(() => {
+    if (!engineReady || !engine.current) return;
+    engine.current.joinChannel(token ?? '', channelName ?? '', uid ?? 0, {
+      clientRoleType: ClientRoleType.ClientRoleBroadcaster,
+      publishCameraTrack: isVideo,
+      publishMicrophoneTrack: true,
+      autoSubscribeAudio: true,
+      autoSubscribeVideo: isVideo,
+    });
+  }, [engineReady]);
+
+  // Pusher: other side ends call
+  useEffect(() => {
+    if (!resolvedConversationId || !channelName) return;
+    const pusher = connectPusher();
+    const chName = `private-conversation-${resolvedConversationId}`;
+    const ch = pusher.subscribe(chName);
+    const onEnded = () => {
+      engine.current?.leaveChannel();
+      dispatch(endCall());
+    };
+    ch.bind('call_ended', onEnded);
+    ch.bind('client-call_ended', onEnded);
+    return () => {
+      ch.unbind('call_ended', onEnded);
+      ch.unbind('client-call_ended', onEnded);
+    };
+  }, [resolvedConversationId, channelName, dispatch]);
 
   // Sync controls
   useEffect(() => { engine.current?.muteLocalAudioStream(isMuted); }, [isMuted]);
   useEffect(() => { engine.current?.setEnableSpeakerphone(isSpeakerOn); }, [isSpeakerOn]);
   useEffect(() => {
-    if (callType === 'video') engine.current?.muteLocalVideoStream(isCameraOff);
+    if (isVideo) engine.current?.muteLocalVideoStream(isCameraOff);
   }, [isCameraOff]);
 
-  const handleEndCall = useCallback(() => {
+  const handleEndCall = useCallback(async () => {
+    if (resolvedConversationId && channelName) {
+      try { await signalCall(resolvedConversationId, 'ended', channelName); } catch {}
+    }
     engine.current?.leaveChannel();
     dispatch(endCall());
-  }, [dispatch]);
+  }, [dispatch, resolvedConversationId, channelName]);
 
   const name = isGroup ? groupName || 'Group Call' : remoteUser?.name || 'Unknown';
   const avatar = !isGroup ? remoteUser?.avatar : null;
-  const isVideo = callType === 'video';
 
   return (
     <View style={styles.container}>
-      {/* Video views */}
-      {isVideo && remoteUids.length > 0 ? (
-        <RtcSurfaceView
-          style={styles.remoteVideo}
-          canvas={{ uid: remoteUids[0], sourceType: VideoSourceType.VideoSourceRemote }}
-        />
-      ) : (
-        <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.remoteVideo}>
-          <View style={styles.avatarCenter}>
-            {avatar ? (
-              <Image source={{ uri: avatar }} style={styles.avatar} />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <FontAwesome6 name={isGroup ? 'users' : 'user'} iconStyle="solid" size={normalize(48)} color="#fff" />
+
+      {isVideo && engineReady ? (
+        <View style={styles.full}>
+          {/* Remote video — ALWAYS mounted so Agora can render into it */}
+          <RtcSurfaceView
+            style={styles.full}
+            zOrderMediaOverlay={false}
+            canvas={{
+              uid: remoteUid ?? 0,
+              sourceType: VideoSourceType.VideoSourceRemote,
+              renderMode: RenderModeType.RenderModeHidden,
+            }}
+          />
+
+          {/* Avatar overlay — shown on top until remote joins */}
+          {remoteUid === null && (
+            <View style={styles.avatarOverlay}>
+              <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={StyleSheet.absoluteFill} />
+              <View style={styles.avatarCenter}>
+                {avatar
+                  ? <Image source={{ uri: avatar }} style={styles.avatar} />
+                  : <View style={styles.avatarPlaceholder}>
+                      <FontAwesome6 name={isGroup ? 'users' : 'user'} iconStyle="solid" size={normalize(48)} color="#fff" />
+                    </View>
+                }
+                <Text style={styles.remoteName}>{name}</Text>
+                <Text style={styles.timer}>{formatTime(elapsed)}</Text>
               </View>
-            )}
+            </View>
+          )}
+
+          {/* Local video PiP — always on top */}
+          {!isCameraOff && (
+            <RtcSurfaceView
+              style={styles.localVideo}
+              zOrderMediaOverlay={true}
+              canvas={{
+                uid: 0,
+                sourceType: VideoSourceType.VideoSourceCamera,
+                renderMode: RenderModeType.RenderModeHidden,
+              }}
+            />
+          )}
+        </View>
+      ) : (
+        // Audio call or engine not ready
+        <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.full}>
+          <View style={styles.avatarCenter}>
+            {avatar
+              ? <Image source={{ uri: avatar }} style={styles.avatar} />
+              : <View style={styles.avatarPlaceholder}>
+                  <FontAwesome6 name={isGroup ? 'users' : 'user'} iconStyle="solid" size={normalize(48)} color="#fff" />
+                </View>
+            }
             <Text style={styles.remoteName}>{name}</Text>
             <Text style={styles.timer}>{formatTime(elapsed)}</Text>
           </View>
         </LinearGradient>
       )}
 
-      {/* Local video (picture-in-picture) */}
-      {isVideo && !isCameraOff && (
-        <RtcSurfaceView
-          style={styles.localVideo}
-          canvas={{ uid: 0, sourceType: VideoSourceType.VideoSourceCamera }}
-        />
-      )}
-
-      {/* Name + timer overlay for video */}
-      {isVideo && remoteUids.length > 0 && (
+      {/* Overlay name + timer when remote is visible */}
+      {isVideo && remoteUid !== null && (
         <SafeAreaView style={styles.overlay} edges={['top']}>
           <Text style={styles.overlayName}>{name}</Text>
           <Text style={styles.overlayTimer}>{formatTime(elapsed)}</Text>
@@ -140,76 +217,67 @@ export default function ActiveCallScreen() {
       {/* Controls */}
       <SafeAreaView style={styles.controls} edges={['bottom']}>
         <View style={styles.controlRow}>
-          {/* Mute */}
+
           <View style={styles.controlWrap}>
             <TouchableOpacity
-              style={[styles.controlBtn, isMuted && styles.controlBtnActive]}
+              style={[styles.controlBtn, isMuted && styles.active]}
               onPress={() => dispatch(toggleMute())}
             >
-              <FontAwesome6
-                name={isMuted ? 'microphone-slash' : 'microphone'}
-                iconStyle="solid" size={normalize(22)} color="#fff"
-              />
+              <FontAwesome6 name={isMuted ? 'microphone-slash' : 'microphone'} iconStyle="solid" size={normalize(22)} color="#fff" />
             </TouchableOpacity>
             <Text style={styles.controlLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
           </View>
 
-          {/* Speaker */}
           <View style={styles.controlWrap}>
             <TouchableOpacity
-              style={[styles.controlBtn, isSpeakerOn && styles.controlBtnActive]}
+              style={[styles.controlBtn, isSpeakerOn && styles.active]}
               onPress={() => dispatch(toggleSpeaker())}
             >
-              <FontAwesome6
-                name={isSpeakerOn ? 'volume-high' : 'volume-xmark'}
-                iconStyle="solid" size={normalize(22)} color="#fff"
-              />
+              <FontAwesome6 name={isSpeakerOn ? 'volume-high' : 'volume-xmark'} iconStyle="solid" size={normalize(22)} color="#fff" />
             </TouchableOpacity>
             <Text style={styles.controlLabel}>{isSpeakerOn ? 'Speaker' : 'Earpiece'}</Text>
           </View>
 
-          {/* Camera toggle (video only) */}
           {isVideo && (
             <View style={styles.controlWrap}>
               <TouchableOpacity
-                style={[styles.controlBtn, isCameraOff && styles.controlBtnActive]}
+                style={[styles.controlBtn, isCameraOff && styles.active]}
                 onPress={() => dispatch(toggleCamera())}
               >
-                <FontAwesome6
-                  name={isCameraOff ? 'video-slash' : 'video'}
-                  iconStyle="solid" size={normalize(22)} color="#fff"
-                />
+                <FontAwesome6 name={isCameraOff ? 'video-slash' : 'video'} iconStyle="solid" size={normalize(22)} color="#fff" />
               </TouchableOpacity>
-              <Text style={styles.controlLabel}>{isCameraOff ? 'Camera Off' : 'Camera'}</Text>
+              <Text style={styles.controlLabel}>{isCameraOff ? 'Cam Off' : 'Camera'}</Text>
             </View>
           )}
 
-          {/* Flip camera (video only) */}
           {isVideo && (
             <View style={styles.controlWrap}>
-              <TouchableOpacity
-                style={styles.controlBtn}
-                onPress={() => engine.current?.switchCamera()}
-              >
+              <TouchableOpacity style={styles.controlBtn} onPress={() => engine.current?.switchCamera()}>
                 <FontAwesome6 name="rotate" iconStyle="solid" size={normalize(22)} color="#fff" />
               </TouchableOpacity>
               <Text style={styles.controlLabel}>Flip</Text>
             </View>
           )}
+
         </View>
 
-        {/* End call */}
         <TouchableOpacity style={styles.endBtn} onPress={handleEndCall}>
           <FontAwesome6 name="phone-slash" iconStyle="solid" size={normalize(28)} color="#fff" />
         </TouchableOpacity>
       </SafeAreaView>
+
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  remoteVideo: { flex: 1 },
+  full: { flex: 1 },
+  avatarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   localVideo: {
     position: 'absolute', top: normalize(60), right: normalize(16),
     width: normalize(100), height: normalize(140),
@@ -237,7 +305,7 @@ const styles = StyleSheet.create({
     width: normalize(56), height: normalize(56), borderRadius: normalize(28),
     backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center',
   },
-  controlBtnActive: { backgroundColor: 'rgba(255,255,255,0.5)' },
+  active: { backgroundColor: 'rgba(255,255,255,0.5)' },
   controlLabel: { fontSize: normalize(11), color: 'rgba(255,255,255,0.7)' },
   endBtn: {
     alignSelf: 'center', width: normalize(70), height: normalize(70),

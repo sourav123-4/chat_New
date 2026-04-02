@@ -53,3 +53,11 @@ export const notifyOnline = () => apiCall('/api/pusher/online');
 export const notifyOffline = () => apiCall('/api/pusher/offline');
 export const markMessagesRead = (conversationId: string) =>
   apiCall('/messages/read', { conversationId });
+export const signalCall = (conversationId: string, event: 'accepted' | 'declined' | 'ended', channelName: string) =>
+  apiCall('/api/calls/signal', { conversationId, event, channelName });
+
+// Extract conversationId from channelName like "call_<conversationId>_<timestamp>"
+export const extractConversationId = (channelName: string): string | null => {
+  const match = channelName?.match(/^call_(.+)_\d+$/);
+  return match ? match[1] : null;
+};

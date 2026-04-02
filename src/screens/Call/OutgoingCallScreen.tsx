@@ -3,10 +3,10 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, Animated } from 'react
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FontAwesome6 from '@react-native-vector-icons/fontawesome6';
 import { useAppDispatch, useAppSelector } from '../../store';
-import { endCall } from '../../store/slice/call.slice';
+import { endCall, callConnected } from '../../store/slice/call.slice';
 import { normalize } from '../../utils/orientation';
 import LinearGradient from 'react-native-linear-gradient';
-import { getChannel, releaseChannel } from '../../utils/helpers/socket';
+import { connectPusher } from '../../utils/helpers/socket';
 
 export default function OutgoingCallScreen() {
   const dispatch = useAppDispatch();
@@ -24,22 +24,62 @@ export default function OutgoingCallScreen() {
     return () => pulse.stop();
   }, []);
 
-  // Listen for decline from receiver via Pusher client event
   useEffect(() => {
-    if (!conversationId) return;
+    console.log('[OutgoingCall] conversationId:', conversationId, 'channelName:', channelName);
+    if (!conversationId || !channelName) {
+      console.warn('[OutgoingCall] Missing conversationId or channelName — cannot listen for signals');
+      return;
+    }
+
+    const pusher = connectPusher();
     const chName = `private-conversation-${conversationId}`;
-    const ch = getChannel(chName);
+    console.log('[OutgoingCall] Subscribing to Pusher channel:', chName);
+
+    const ch = pusher.subscribe(chName);
+
+    ch.bind('pusher:subscription_succeeded', () => {
+      console.log('[OutgoingCall] ✅ Subscribed to:', chName);
+    });
+
+    ch.bind('pusher:subscription_error', (err: any) => {
+      console.error('[OutgoingCall] ❌ Subscription error:', err);
+    });
+
+    // Catch ALL events on this channel for debugging
+    ch.bind_global((event: string, data: any) => {
+      console.log('[OutgoingCall] 📡 Pusher event received:', event, JSON.stringify(data));
+    });
+
+    const onAccepted = (data: any) => {
+      console.log('[OutgoingCall] call_accepted received, data:', JSON.stringify(data), 'expected channelName:', channelName);
+      dispatch(callConnected());
+    };
 
     const onDeclined = (data: any) => {
-      if (data?.channelName === channelName) {
-        dispatch(endCall());
-      }
+      console.log('[OutgoingCall] call_declined received, data:', JSON.stringify(data), 'expected channelName:', channelName);
+      dispatch(endCall());
     };
+
+    const onEnded = (data: any) => {
+      console.log('[OutgoingCall] call_ended received:', JSON.stringify(data));
+      dispatch(endCall());
+    };
+
+    ch.bind('call_accepted', onAccepted);
+    ch.bind('call_declined', onDeclined);
+    ch.bind('call_ended', onEnded);
+    ch.bind('client-call_accepted', onAccepted);
     ch.bind('client-call_declined', onDeclined);
+    ch.bind('client-call_ended', onEnded);
 
     return () => {
+      ch.unbind_global();
+      ch.unbind('call_accepted', onAccepted);
+      ch.unbind('call_declined', onDeclined);
+      ch.unbind('call_ended', onEnded);
+      ch.unbind('client-call_accepted', onAccepted);
       ch.unbind('client-call_declined', onDeclined);
-      releaseChannel(chName);
+      ch.unbind('client-call_ended', onEnded);
     };
   }, [conversationId, channelName, dispatch]);
 

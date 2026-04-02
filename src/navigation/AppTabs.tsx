@@ -2,6 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import HomeScreen from '../screens/Main/HomeScreen';
 import ProfileScreen from '../screens/Main/ProfileScreen';
+import CallHistoryScreen from '../screens/Call/CallHistoryScreen';
 import { StyleSheet } from 'react-native';
 import { AppTabParamList } from '../types';
 import FontAwesome6 from '@react-native-vector-icons/fontawesome6';
@@ -20,12 +21,17 @@ export default function AppTabs() {
         tabBarInactiveTintColor: '#9ca3af',
         tabBarLabelStyle: styles.label,
         tabBarIcon: ({ color }) => {
-          const iconName = route.name === 'Home' ? 'house' : 'user';
-          return <FontAwesome6 name={iconName} iconStyle="solid" size={20} color={color} />;
+          const icons: Record<string, string> = {
+            Home: 'house',
+            Calls: 'phone',
+            Profile: 'user',
+          };
+          return <FontAwesome6 name={icons[route.name]} iconStyle="solid" size={20} color={color} />;
         },
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Chats' }} />
+      <Tab.Screen name="Calls" component={CallHistoryScreen} options={{ title: 'Calls' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import FontAwesome6 from '@react-native-vector-icons/fontawesome6';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { endCall, callConnected } from '../../store/slice/call.slice';
+import { messegeSendRequest } from '../../store/slice/messege.slice';
 import { normalize } from '../../utils/orientation';
 import LinearGradient from 'react-native-linear-gradient';
 import { signalCall, extractConversationId } from '../../utils/helpers/socket';
@@ -39,16 +40,27 @@ export default function IncomingCallScreen() {
 
   const handleDecline = async () => {
     Vibration.cancel();
-    console.log('[IncomingCall] Decline — resolvedConversationId:', resolvedConversationId, 'channelName:', channelName);
-    if (resolvedConversationId && channelName) {
+    const convId = resolvedConversationId;
+    const chName = channelName;
+    const cType = callType;
+    if (convId && chName) {
       try {
-        const res = await signalCall(resolvedConversationId, 'declined', channelName);
+        const res = await signalCall(convId, 'declined', chName);
         console.log('[IncomingCall] signalCall declined status:', res.status);
       } catch (e) {
         console.error('[IncomingCall] signalCall declined error:', e);
       }
     }
     dispatch(endCall());
+    if (convId) {
+      dispatch(messegeSendRequest({
+        conversationId: convId,
+        messageType: 'call',
+        callType: cType,
+        callStatus: 'declined',
+        duration: 0,
+      }));
+    }
   };
 
   const handleAccept = async () => {

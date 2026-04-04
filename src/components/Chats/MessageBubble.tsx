@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { normalize } from '../../utils/orientation';
 import { TickIcon } from '../TickIcon';
+import FontAwesome6 from '@react-native-vector-icons/fontawesome6';
 
 interface MessageBubbleProps {
   message: any;
@@ -58,6 +59,35 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const renderContent = () => {
     switch (message.messageType) {
+      case 'call': {
+        const isVideo = message.callType === 'video';
+        const isMissed = message.callStatus === 'missed';
+        const isDec = message.callStatus === 'declined';
+        const dur = message.duration;
+        const durText = dur
+          ? ` · ${Math.floor(dur / 60) > 0 ? `${Math.floor(dur / 60)}m ` : ''}${dur % 60}s`
+          : '';
+        return (
+          <View style={styles.callRow}>
+            <FontAwesome6
+              name={isMissed || isDec ? 'phone-slash' : isVideo ? 'video' : 'phone'}
+              iconStyle="solid"
+              size={normalize(14)}
+              color={isMyMessage ? (isMissed || isDec ? '#fca5a5' : '#fff') : (isMissed || isDec ? '#EF4444' : '#6A11CB')}
+            />
+            <View style={{ marginLeft: normalize(8) }}>
+              <Text style={[styles.callText, isMyMessage ? styles.myText : styles.otherText]}>
+                {isMissed ? 'Missed call' : isDec ? 'Declined' : isVideo ? 'Video call' : 'Voice call'}
+                {durText}
+              </Text>
+              <Text style={[styles.timestamp, isMyMessage ? styles.myTimestamp : styles.otherTimestamp]}>
+                {timestamp}
+              </Text>
+            </View>
+          </View>
+        );
+      }
+
       case 'text':
         return (
           <>
@@ -280,6 +310,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  callRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: normalize(4),
+  },
+  callText: {
+    fontSize: normalize(14),
+    fontWeight: '500',
   },
   playIcon: {
     color: '#fff',

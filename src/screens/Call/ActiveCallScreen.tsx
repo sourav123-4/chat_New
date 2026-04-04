@@ -15,6 +15,7 @@ import {
 } from 'react-native-agora';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { endCall, toggleMute, toggleSpeaker, toggleCamera } from '../../store/slice/call.slice';
+import { messegeSendRequest } from '../../store/slice/messege.slice';
 import { normalize } from '../../utils/orientation';
 import { AGORA_APP_ID_VALUE } from '../../utils/helpers/agora';
 import { signalCall, extractConversationId, connectPusher } from '../../utils/helpers/socket';
@@ -71,7 +72,20 @@ export default function ActiveCallScreen() {
       onUserOffline: (_connection: RtcConnection, rUid: number, _reason: UserOfflineReasonType) => {
         console.log('[Agora] remote user offline:', rUid);
         setRemoteUid(null);
+        // Capture before endCall clears state
+        const convId = resolvedConversationId;
+        const cType = callType;
+        const dur = callStartedAt ? Math.floor((Date.now() - callStartedAt) / 1000) : 0;
         dispatch(endCall());
+        if (convId) {
+          dispatch(messegeSendRequest({
+            conversationId: convId,
+            messageType: 'call',
+            callType: cType,
+            callStatus: 'answered',
+            duration: dur,
+          }));
+        }
       },
       onError: (err: number, msg: string) => {
         console.log('[Agora] error:', err, msg);
@@ -134,12 +148,32 @@ export default function ActiveCallScreen() {
   }, [isCameraOff]);
 
   const handleEndCall = useCallback(async () => {
-    if (resolvedConversationId && channelName) {
-      try { await signalCall(resolvedConversationId, 'ended', channelName); } catch {}
+    // Capture before endCall clears state
+    const convId = resolvedConversationId;
+    const chName = channelName;
+    const cType = callType;
+    const duration = callStartedAt
+      ? Math.floor((Date.now() - callStartedAt) / 1000)
+      : 0;
+
+    if (convId && chName) {
+      try { await signalCall(convId, 'ended', chName); } catch {}
     }
+
     engine.current?.leaveChannel();
     dispatch(endCall());
-  }, [dispatch, resolvedConversationId, channelName]);
+
+    // Save call message AFTER endCall so it appears in chat
+    if (convId) {
+      dispatch(messegeSendRequest({
+        conversationId: convId,
+        messageType: 'call',
+        callType: cType,
+        callStatus: 'answered',
+        duration,
+      }));
+    }
+  }, [dispatch, resolvedConversationId, channelName, callStartedAt, callType]);
 
   const name = isGroup ? groupName || 'Group Call' : remoteUser?.name || 'Unknown';
   const avatar = !isGroup ? remoteUser?.avatar : null;

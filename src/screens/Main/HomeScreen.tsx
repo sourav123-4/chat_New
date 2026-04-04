@@ -127,8 +127,14 @@ export default function HomeScreen({ navigation }: { navigation: HomeNavProp }) 
     if (isTyping) return 'typing...';
     if (!msg) return 'Start a conversation';
     const type = msg.messageType ?? msg.file?.type;
-    if (type === 'image') return 'Photo';
-    if (type === 'video') return 'Video';
+    if (type === 'image') return '📷 Photo';
+    if (type === 'video') return '🎥 Video';
+    if (type === 'call') {
+      const icon = msg.callType === 'video' ? '📹' : '📞';
+      if (msg.callStatus === 'missed') return `${icon} Missed call`;
+      if (msg.callStatus === 'declined') return `${icon} Declined`;
+      return `${icon} ${msg.callType === 'video' ? 'Video' : 'Voice'} call`;
+    }
     return msg.text || 'Start a conversation';
   };
 

@@ -52,7 +52,7 @@ const apiCall = (path: string, body: object = {}) => {
 export const notifyOnline = () => apiCall('/api/pusher/online');
 export const notifyOffline = () => apiCall('/api/pusher/offline');
 export const markMessagesRead = (conversationId: string) =>
-  apiCall('/messages/read', { conversationId });
+  apiCall('/api/messages/read', { conversationId });
 export const signalCall = (conversationId: string, event: 'accepted' | 'declined' | 'ended', channelName: string) =>
   apiCall('/api/calls/signal', { conversationId, event, channelName });
 

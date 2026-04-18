@@ -56,6 +56,7 @@ export default function ChatScreen({ route, navigation }: Props) {
   const [isTyping, setIsTyping] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
   const [lastSeen, setLastSeen] = useState<number | null>(null);
+  const [replyTo, setReplyTo] = useState<any | null>(null);
 
   useEffect(() => {
     if (chatUser?.isOnline !== undefined) setIsOnline(chatUser.isOnline);
@@ -246,12 +247,13 @@ export default function ChatScreen({ route, navigation }: Props) {
 
   const sendText = useCallback(() => {
     if (!text.trim()) return;
-    const temp = createTempMessage({ messageType: 'text', text: text.trim() });
+    const temp = createTempMessage({ messageType: 'text', text: text.trim(), replyTo: replyTo?._id });
     setMessages((prev) => [temp, ...prev]);
-    dispatch(messegeSendRequest({ conversationId: chatId, text: text.trim() }));
+    dispatch(messegeSendRequest({ conversationId: chatId, text: text.trim(), replyTo: replyTo?._id }));
     setText('');
+    setReplyTo(null);
     emitStopTyping();
-  }, [text, createTempMessage, dispatch, chatId, emitStopTyping]);
+  }, [text, replyTo, createTempMessage, dispatch, chatId, emitStopTyping]);
 
   const requestMediaPermission = useCallback(async (type: 'photo' | 'video') => {
     if (Platform.OS !== 'android') return true;
@@ -348,10 +350,7 @@ export default function ChatScreen({ route, navigation }: Props) {
 
   const renderItem = useCallback(({ item, index }: any) => {
     const isMe = isMyMessage(item);
-    // In inverted FlatList: index+1 is the message ABOVE (older)
-    // Show date header BETWEEN this message and the one above
-    // Render it AFTER the bubble so it appears ABOVE in inverted
-    const nextMsg = messages[index + 1]; // older message above
+    const nextMsg = messages[index + 1];
     const showDateHeader = isNewDay(item, nextMsg);
     return (
       <>
@@ -359,6 +358,7 @@ export default function ChatScreen({ route, navigation }: Props) {
           <MessageBubble
             message={item} isMyMessage={isMe} isGroupChat={isGroupChat}
             onImagePress={setViewImageUrl} onVideoPress={setPlayVideoUrl} onDownload={downloadFile}
+            onReply={(msg) => setReplyTo(msg)}
           />
         </View>
         {showDateHeader && <DateHeader date={item.createdAt} />}
@@ -453,6 +453,7 @@ export default function ChatScreen({ route, navigation }: Props) {
         <ChatInput
           value={text} onChangeText={handleTextChange}
           onSend={sendText} onImagePress={pickImage} onVideoPress={pickVideo}
+          replyTo={replyTo} onCancelReply={() => setReplyTo(null)}
         />
       </KeyboardAvoidingView>
 

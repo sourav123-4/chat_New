@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { AppState } from "react-native";
+import { AppState, DeviceEventEmitter } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import AuthStack from "./src/navigation/AuthStack";
 import AppStack from "./src/navigation/AppStack";
@@ -15,10 +15,19 @@ import {
   onNotificationOpened,
   getInitialNotification,
   dispatchIncomingCall,
+  cancelIncomingCallNotification,
 } from "./src/utils/helpers/NotificationService";
-import { notifyOnline, notifyOffline, disconnectPusher } from "./src/utils/helpers/socket";
+import {
+  signalCall,
+  extractConversationId,
+  notifyOnline,
+  notifyOffline,
+  disconnectPusher,
+} from "./src/utils/helpers/socket";
+import { endCall } from "./src/store/slice/call.slice";
 import { getDB } from "./src/db/sqlite";
 import CallOverlay from "./src/components/CallOverlay";
+import { setupCallKeep } from "./src/utils/helpers/CallKeepService";
 
 function Routes() {
   const { token } = useAppSelector(state => state.auth);
@@ -26,56 +35,97 @@ function Routes() {
 
   useEffect(() => {
     configureGoogleSignIn();
-    getDB(); // Initialize SQLite schema on app start
+    getDB();
+    setupCallKeep();
   }, []);
 
   useEffect(() => {
     const setup = async () => {
       await initNotification();
-      const token = await getFcmToken();
-      if (token) store.dispatch(setDeviceToken(token));
+      const fcmToken = await getFcmToken();
+      if (fcmToken) store.dispatch(setDeviceToken(fcmToken));
     };
     setup();
+
     const unsubscribeForeground = listenForegroundNotification();
 
-    // Handle notification tap from background
-    onNotificationOpened((data) => {
-      if (data?.type === 'incoming_call') {
+    // Handle accept/decline from native IncomingCallActivity
+    // This fires when app is in background OR killed (via onResume flush)
+    const callActionSub = DeviceEventEmitter.addListener(
+      "onCallAction",
+      params => {
+        console.log("[App] onCallAction:", params);
+        const convId =
+          params.conversationId || extractConversationId(params.channelName);
+
+        if (params.action === "accept") {
+          // Dispatch incoming call first so Redux has the data
+          dispatchIncomingCall(
+            {
+              callType: params.callType,
+              channelName: params.channelName,
+              token: params.token,
+              uid: params.uid,
+              conversationId: params.conversationId,
+              callerId: params.callerId,
+              callerName: params.callerName,
+              callerAvatar: params.callerAvatar,
+            },
+            true, // autoAccepted = true → goes straight to ActiveCallScreen
+          );
+          if (convId && params.channelName) {
+            signalCall(convId, "accepted", params.channelName).catch(() => {});
+          }
+        } else if (params.action === "decline") {
+          if (convId && params.channelName) {
+            signalCall(convId, "declined", params.channelName).catch(() => {});
+          }
+          store.dispatch(endCall());
+          cancelIncomingCallNotification();
+        }
+      },
+    );
+
+    // Notification tap from background
+    onNotificationOpened(data => {
+      if (data?.type === "incoming_call") {
         dispatchIncomingCall(data);
       }
     });
 
-    // Handle notification tap from killed state
-    getInitialNotification((data) => {
-      if (data?.type === 'incoming_call') {
+    // Notification tap from killed state
+    getInitialNotification(data => {
+      if (data?.type === "incoming_call") {
         dispatchIncomingCall(data);
-      }
-    });
-
-    return () => unsubscribeForeground();
-  }, []);
-
-  // Online / offline based on app foreground state
-  useEffect(() => {
-    if (!token) return;
-
-    const broadcastOnline = () => notifyOnline();
-    const broadcastOffline = () => notifyOffline();
-
-    broadcastOnline();
-
-    const subscription = AppState.addEventListener('change', nextState => {
-      const prev = appState.current;
-      appState.current = nextState;
-      if (nextState === 'active') {
-        broadcastOnline();
-      } else if (prev === 'active' && (nextState === 'background' || nextState === 'inactive')) {
-        broadcastOffline();
       }
     });
 
     return () => {
-      broadcastOffline();
+      unsubscribeForeground();
+      callActionSub.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+
+    notifyOnline();
+
+    const subscription = AppState.addEventListener("change", nextState => {
+      const prev = appState.current;
+      appState.current = nextState;
+      if (nextState === "active") {
+        notifyOnline();
+      } else if (
+        prev === "active" &&
+        (nextState === "background" || nextState === "inactive")
+      ) {
+        notifyOffline();
+      }
+    });
+
+    return () => {
+      notifyOffline();
       disconnectPusher();
       subscription.remove();
     };

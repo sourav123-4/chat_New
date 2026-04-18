@@ -16,10 +16,8 @@ class MainApplication : Application(), ReactApplication {
       context = applicationContext,
       packageList =
         PackageList(this).packages.apply {
-          // Packages that cannot be autolinked yet can be added manually here, for example:
-          // add(MyReactNativePackage())
-          add(BatteryPackage());
-          add(ToastPackage());
+          add(BatteryPackage())
+          add(ToastPackage())
         },
     )
   }

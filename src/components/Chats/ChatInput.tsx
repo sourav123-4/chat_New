@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet, Text } from 'react-native';
 import { normalize } from '../../utils/orientation';
 import FontAwesome6 from '@react-native-vector-icons/fontawesome6';
 
@@ -9,6 +9,8 @@ interface ChatInputProps {
   onSend: () => void;
   onImagePress: () => void;
   onVideoPress: () => void;
+  replyTo?: { _id: string; text?: string; messageType?: string; senderId?: any } | null;
+  onCancelReply?: () => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -17,83 +19,93 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onSend,
   onImagePress,
   onVideoPress,
+  replyTo,
+  onCancelReply,
 }) => {
+  const replyText = replyTo?.text
+    || (replyTo?.messageType === 'image' ? '📷 Photo'
+    : replyTo?.messageType === 'video' ? '🎥 Video'
+    : replyTo?.messageType === 'call' ? '📞 Call'
+    : '...');
+
+  const replySender = typeof replyTo?.senderId === 'object'
+    ? replyTo.senderId?.name
+    : 'Message';
+
   return (
-    <View style={styles.container}>
-      <TouchableOpacity onPress={onImagePress} style={styles.iconBtn}>
-        <FontAwesome6 name="image" iconStyle="solid" size={normalize(20)} color="#6A11CB" />
-      </TouchableOpacity>
+    <View style={styles.wrapper}>
+      {/* Reply preview */}
+      {replyTo && (
+        <View style={styles.replyBar}>
+          <View style={styles.replyAccent} />
+          <View style={styles.replyContent}>
+            <Text style={styles.replyName} numberOfLines={1}>{replySender}</Text>
+            <Text style={styles.replyText} numberOfLines={1}>{replyText}</Text>
+          </View>
+          <TouchableOpacity onPress={onCancelReply} style={styles.replyClose}>
+            <FontAwesome6 name="xmark" iconStyle="solid" size={normalize(14)} color="#888" />
+          </TouchableOpacity>
+        </View>
+      )}
 
-      <TouchableOpacity onPress={onVideoPress} style={styles.iconBtn}>
-        <FontAwesome6 name="video" iconStyle="solid" size={normalize(20)} color="#6A11CB" />
-      </TouchableOpacity>
+      <View style={styles.container}>
+        <TouchableOpacity onPress={onImagePress} style={styles.iconBtn}>
+          <FontAwesome6 name="image" iconStyle="solid" size={normalize(20)} color="#6A11CB" />
+        </TouchableOpacity>
 
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder="Type a message..."
-        style={styles.input}
-        placeholderTextColor="#aaa"
-        multiline
-        maxLength={1000}
-      />
+        <TouchableOpacity onPress={onVideoPress} style={styles.iconBtn}>
+          <FontAwesome6 name="video" iconStyle="solid" size={normalize(20)} color="#6A11CB" />
+        </TouchableOpacity>
 
-      <TouchableOpacity
-        onPress={onSend}
-        style={[styles.sendBtn, !value.trim() && styles.sendBtnDisabled]}
-        disabled={!value.trim()}
-      >
-        <FontAwesome6 name="paper-plane" iconStyle="solid" size={normalize(16)} color="#fff" />
-      </TouchableOpacity>
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder="Type a message..."
+          style={styles.input}
+          placeholderTextColor="#aaa"
+          multiline
+          maxLength={1000}
+        />
+
+        <TouchableOpacity
+          onPress={onSend}
+          style={[styles.sendBtn, !value.trim() && styles.sendBtnDisabled]}
+          disabled={!value.trim()}
+        >
+          <FontAwesome6 name="paper-plane" iconStyle="solid" size={normalize(16)} color="#fff" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  wrapper: { backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#F0F0F0' },
+  replyBar: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: normalize(12), paddingVertical: normalize(8),
+    backgroundColor: '#F8F4FF',
+  },
+  replyAccent: { width: 3, borderRadius: 2, backgroundColor: '#6A11CB', alignSelf: 'stretch', marginRight: normalize(8) },
+  replyContent: { flex: 1 },
+  replyName: { fontSize: normalize(12), fontWeight: '700', color: '#6A11CB', marginBottom: 2 },
+  replyText: { fontSize: normalize(12), color: '#555' },
+  replyClose: { padding: normalize(4) },
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: normalize(10),
-    paddingVertical: normalize(8),
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    gap: normalize(6),
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: normalize(10), paddingVertical: normalize(8),
   },
-  iconBtn: {
-    width: normalize(36),
-    height: normalize(36),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  iconBtn: { padding: normalize(6), marginRight: normalize(2) },
   input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: normalize(22),
-    paddingHorizontal: normalize(14),
-    paddingVertical: normalize(8),
-    fontSize: normalize(14),
-    color: '#111',
-    backgroundColor: '#F8F9FA',
-    maxHeight: normalize(100),
+    flex: 1, minHeight: normalize(40), maxHeight: normalize(120),
+    backgroundColor: '#F5F5F5', borderRadius: normalize(20),
+    paddingHorizontal: normalize(14), paddingVertical: normalize(8),
+    fontSize: normalize(15), color: '#111',
+    marginHorizontal: normalize(6),
   },
   sendBtn: {
-    width: normalize(40),
-    height: normalize(40),
-    borderRadius: normalize(20),
-    backgroundColor: '#6A11CB',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#6A11CB',
-    shadowOpacity: 0.35,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    width: normalize(40), height: normalize(40), borderRadius: normalize(20),
+    backgroundColor: '#6A11CB', justifyContent: 'center', alignItems: 'center',
   },
-  sendBtnDisabled: {
-    backgroundColor: '#C4B5FD',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
+  sendBtnDisabled: { backgroundColor: '#C4B5FD' },
 });

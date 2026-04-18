@@ -12,7 +12,7 @@ export interface CallHistoryItem {
   direction: 'incoming' | 'outgoing';
   status: 'answered' | 'missed' | 'declined';
   timestamp: number;
-  duration?: number; // seconds
+  duration?: number;
 }
 
 interface CallState {
@@ -31,6 +31,7 @@ interface CallState {
   isCameraOff: boolean;
   callStartedAt: number | null;
   autoAccepted: boolean;
+  isCaller: boolean;
   history: CallHistoryItem[];
 }
 
@@ -50,6 +51,7 @@ const initialState: CallState = {
   isCameraOff: false,
   callStartedAt: null,
   autoAccepted: false,
+  isCaller: false,
   history: [],
 };
 
@@ -58,9 +60,15 @@ const callSlice = createSlice({
   initialState,
   reducers: {
     startOutgoingCall(state, action: PayloadAction<{
-      callType: CallType; channelName: string; token: string; uid: number;
-      conversationId: string; remoteUser: CallState['remoteUser'];
-      isGroup?: boolean; groupName?: string; participants?: string[];
+      callType: CallType;
+      channelName: string;
+      token: string;
+      uid: number;
+      conversationId: string;
+      remoteUser: CallState['remoteUser'];
+      isGroup?: boolean;
+      groupName?: string;
+      participants?: string[];
     }>) {
       state.status = 'outgoing';
       state.callType = action.payload.callType;
@@ -76,12 +84,19 @@ const callSlice = createSlice({
       state.isSpeakerOn = false;
       state.isCameraOff = false;
       state.callStartedAt = null;
+      state.isCaller = true;
     },
 
     receiveIncomingCall(state, action: PayloadAction<{
-      callType: CallType; channelName: string; token: string; uid: number;
-      conversationId?: string; remoteUser: CallState['remoteUser'];
-      isGroup?: boolean; groupName?: string; autoAccepted?: boolean;
+      callType: CallType;
+      channelName: string;
+      token: string;
+      uid: number;
+      conversationId?: string;
+      remoteUser: CallState['remoteUser'];
+      isGroup?: boolean;
+      groupName?: string;
+      autoAccepted?: boolean;
     }>) {
       state.status = 'incoming';
       state.callType = action.payload.callType;
@@ -97,6 +112,7 @@ const callSlice = createSlice({
       state.isCameraOff = false;
       state.callStartedAt = null;
       state.autoAccepted = action.payload.autoAccepted ?? false;
+      state.isCaller = false;
     },
 
     callConnected(state) {
@@ -105,12 +121,11 @@ const callSlice = createSlice({
     },
 
     endCall(state) {
-      // Save to history if there was an active/outgoing/incoming call
       if (state.remoteUser && state.callType) {
         const duration = state.callStartedAt
           ? Math.floor((Date.now() - state.callStartedAt) / 1000)
           : undefined;
-        const status = state.status === 'active'
+        const histStatus = state.status === 'active'
           ? 'answered'
           : state.status === 'incoming'
           ? 'missed'
@@ -121,17 +136,13 @@ const callSlice = createSlice({
           callerName: state.remoteUser.name,
           callerAvatar: state.remoteUser.avatar,
           callType: state.callType,
-          direction: state.status === 'outgoing' || (state.status === 'active' && !state.autoAccepted)
-            ? 'outgoing'
-            : 'incoming',
-          status,
+          direction: state.isCaller ? 'outgoing' : 'incoming',
+          status: histStatus,
           timestamp: Date.now(),
           duration,
         });
-        // Keep only last 100 entries
         if (state.history.length > 100) state.history = state.history.slice(0, 100);
       }
-      // Reset call state but keep history
       const history = state.history;
       Object.assign(state, { ...initialState, history });
     },
@@ -152,9 +163,15 @@ const callSlice = createSlice({
 });
 
 export const {
-  startOutgoingCall, receiveIncomingCall, callConnected, endCall,
-  addCallHistory, clearCallHistory,
-  toggleMute, toggleSpeaker, toggleCamera,
+  startOutgoingCall,
+  receiveIncomingCall,
+  callConnected,
+  endCall,
+  addCallHistory,
+  clearCallHistory,
+  toggleMute,
+  toggleSpeaker,
+  toggleCamera,
 } = callSlice.actions;
 
 export default callSlice.reducer;

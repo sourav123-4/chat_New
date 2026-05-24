@@ -66,11 +66,10 @@ export const signOutFromGoogle = async () => {
 // Get current user
 export const getCurrentGoogleUser = async () => {
   try {
-    const isSignedIn = await GoogleSignin.isSignedIn();
-    if (!isSignedIn) {
+    const userInfo = await GoogleSignin.getCurrentUser();
+    if (!userInfo) {
       return { success: false, user: null };
     }
-    const userInfo = await GoogleSignin.getCurrentUser();
     return { success: true, user: userInfo };
   } catch (error: any) {
     return {

@@ -139,12 +139,12 @@ export default function AddFriendsScreen({ navigation }: any) {
             renderItem={renderItem}
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
-              !loading && (
+              !loading ? (
                 <View style={styles.empty}>
                   <FontAwesome6 name="user" size={normalize(48)} color="#ccc" />
                   <Text style={styles.emptyText}>No users found</Text>
                 </View>
-              )
+              ) : null
             }
           />
 

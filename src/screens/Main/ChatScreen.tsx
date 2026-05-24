@@ -9,7 +9,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../types';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { messegeListRequest, messegeSendRequest } from '../../store/slice/messege.slice';
-import { startOutgoingCall } from '../../store/slice/call.slice';
+import { endCall, startOutgoingCall } from '../../store/slice/call.slice';
 import { fetchAgoraToken, generateChannelName, generateUID, requestCallPermissions, initiateCall } from '../../utils/helpers/agora';
 import { normalize } from '../../utils/orientation';
 import { downloadFile } from '../../utils/helpers';
@@ -36,6 +36,31 @@ type Props = NativeStackScreenProps<AppStackParamList, 'Chat'>;
 const LIMIT = 20;
 const STALE_MS = 2 * 60 * 1000; // 2 minutes
 
+const getConversationId = (message: any) => (
+  typeof message?.conversationId === 'object' ? message.conversationId?._id : message?.conversationId
+);
+
+const formatLastSeen = (value: string | number | Date) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const now = new Date();
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (sameDay) return `last seen today at ${time}`;
+
+  const day = date.toLocaleDateString([], {
+    day: 'numeric',
+    month: 'short',
+    year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric',
+  });
+  return `last seen ${day} at ${time}`;
+};
+
 export default function ChatScreen({ route, navigation }: Props) {
   const { chatId, chatUser, isGroupChat, groupName } = route.params;
   const { userId } = useAppSelector((s) => s.auth);
@@ -55,7 +80,7 @@ export default function ChatScreen({ route, navigation }: Props) {
   const [viewImageUrl, setViewImageUrl] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
-  const [lastSeen, setLastSeen] = useState<number | null>(null);
+  const [lastSeen, setLastSeen] = useState<string | number | null>(null);
   const [replyTo, setReplyTo] = useState<any | null>(null);
 
   useEffect(() => {
@@ -89,24 +114,28 @@ export default function ChatScreen({ route, navigation }: Props) {
 
   const handleMessageDelivered = useCallback(({ messageId }: any) => {
     if (messageId) {
+      const deliveredMessage = messages.find((m) => m._id === messageId);
       setMessages((prev) =>
         prev.map((m) => m._id === messageId ? { ...m, status: 'delivered' } : m)
       );
       updateMessageStatus(messageId, 'delivered');
+      if (deliveredMessage) updateChatLastMessage(chatId, { ...deliveredMessage, status: 'delivered' });
     } else {
       setMessages((prev) =>
         prev.map((m) => isMyMessage(m) && m.status === 'sent' ? { ...m, status: 'delivered' } : m)
       );
       markAllAsDelivered(chatId, userId);
     }
-  }, [isMyMessage, chatId, userId]);
+  }, [isMyMessage, chatId, userId, messages]);
 
   const handleMessageRead = useCallback(() => {
+    const newestOwnMessage = messages.find(isMyMessage);
     setMessages((prev) =>
       prev.map((m) => isMyMessage(m) ? { ...m, status: 'read' } : m)
     );
     markAllAsRead(chatId);
-  }, [isMyMessage, chatId]);
+    if (newestOwnMessage) updateChatLastMessage(chatId, { ...newestOwnMessage, status: 'read' });
+  }, [isMyMessage, chatId, messages]);
 
   const handleUserOnline = useCallback((data: any) => {
     if ((data?.userId ?? data?.id) === chatUser?._id) { setIsOnline(true); setLastSeen(null); }
@@ -224,9 +253,13 @@ export default function ChatScreen({ route, navigation }: Props) {
   useEffect(() => {
     if (!messegeSendResponse?.message) return;
     const msg = messegeSendResponse.message;
+    if (getConversationId(msg) !== chatId) return;
     setMessages((prev) => {
       const idx = prev.findIndex((m) => m.status === 'sending');
-      if (idx === -1) return prev;
+      if (idx === -1) {
+        if (prev.some((m) => m._id === msg._id)) return prev;
+        return [msg, ...prev];
+      }
       const updated = [...prev];
       updated[idx] = msg;
       return updated;
@@ -238,7 +271,7 @@ export default function ChatScreen({ route, navigation }: Props) {
   // ── Mark as read on enter ─────────────────────────────────────
   useEffect(() => {
     if (messages.length > 0) emitMessageRead();
-  }, [messages.length === 0 ? 0 : 1, chatId]);
+  }, [messages[0]?._id, chatId, emitMessageRead]);
 
   const handleTextChange = useCallback(
     (value: string) => handleTypingWithTimeout(() => setText(value)),
@@ -328,7 +361,7 @@ export default function ChatScreen({ route, navigation }: Props) {
     }));
 
     if (chatUser?._id) {
-      await initiateCall({
+      const started = await initiateCall({
         receiverId: chatUser._id,
         channelName,
         agoraToken: callerToken,
@@ -340,6 +373,7 @@ export default function ChatScreen({ route, navigation }: Props) {
         groupName,
         conversationId: chatId,
       });
+      if (!started) dispatch(endCall());
     }
   }, [userId, chatId, chatUser, isGroupChat, groupName, dispatch]);
 
@@ -368,7 +402,7 @@ export default function ChatScreen({ route, navigation }: Props) {
 
   const statusText = isTyping ? 'typing...'
     : isOnline ? 'online'
-    : lastSeen ? `last seen ${new Date(lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : lastSeen ? formatLastSeen(lastSeen)
     : '';
 
   const chatTitle = isGroupChat ? groupName || 'Group Chat' : chatUser?.name || chatUser?.email || 'Chat';

@@ -21,12 +21,12 @@ export default function AppTabs() {
         tabBarInactiveTintColor: '#9ca3af',
         tabBarLabelStyle: styles.label,
         tabBarIcon: ({ color }) => {
-          const icons: Record<string, string> = {
+          const icons: Record<keyof AppTabParamList, string> = {
             Home: 'house',
             Calls: 'phone',
             Profile: 'user',
           };
-          return <FontAwesome6 name={icons[route.name]} iconStyle="solid" size={20} color={color} />;
+          return <FontAwesome6 name={icons[route.name] as any} iconStyle="solid" size={20} color={color} />;
         },
       })}
     >

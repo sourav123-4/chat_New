@@ -12,6 +12,9 @@ const toRow = (msg: any) => ({
   fileUrl: (msg.file?.url ?? null) as string | null,
   fileType: (msg.file?.type ?? null) as string | null,
   fileName: (msg.file?.name ?? null) as string | null,
+  callType: (msg.callType ?? null) as string | null,
+  callStatus: (msg.callStatus ?? null) as string | null,
+  duration: (msg.duration ?? 0) as number,
   status: (msg.status ?? 'sent') as string,
   createdAt: msg.createdAt as string,
   updatedAt: (msg.updatedAt ?? msg.createdAt) as string,
@@ -28,6 +31,9 @@ const fromRow = (row: Record<string, Scalar>) => ({
   file: row.fileUrl
     ? { url: row.fileUrl, type: row.fileType, name: row.fileName }
     : null,
+  callType: row.callType as string | null,
+  callStatus: row.callStatus as string | null,
+  duration: row.duration as number,
   status: row.status as string,
   createdAt: row.createdAt as string,
   updatedAt: row.updatedAt as string,
@@ -44,11 +50,12 @@ export const saveMessages = async (messages: any[]): Promise<void> => {
       await tx.execute(
         `INSERT OR REPLACE INTO messages
           (_id, conversationId, senderId, senderName, senderAvatar, text,
-           messageType, fileUrl, fileType, fileName, status, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           messageType, fileUrl, fileType, fileName, callType, callStatus,
+           duration, status, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [r._id, r.conversationId, r.senderId, r.senderName, r.senderAvatar,
          r.text, r.messageType, r.fileUrl, r.fileType, r.fileName,
-         r.status, r.createdAt, r.updatedAt] as Scalar[]
+         r.callType, r.callStatus, r.duration, r.status, r.createdAt, r.updatedAt] as Scalar[]
       );
     }
   });

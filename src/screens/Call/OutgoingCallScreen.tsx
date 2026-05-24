@@ -4,14 +4,33 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import FontAwesome6 from '@react-native-vector-icons/fontawesome6';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { endCall, callConnected } from '../../store/slice/call.slice';
+import { messegeSendRequest } from '../../store/slice/messege.slice';
 import { normalize } from '../../utils/orientation';
 import LinearGradient from 'react-native-linear-gradient';
-import { connectPusher } from '../../utils/helpers/socket';
+import { connectPusher, signalCall } from '../../utils/helpers/socket';
 
 export default function OutgoingCallScreen() {
   const dispatch = useAppDispatch();
   const { remoteUser, callType, isGroup, groupName, conversationId, channelName } = useAppSelector((s) => s.call);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const closedRef = useRef(false);
+
+  const finishOutgoing = async (callStatus: 'missed' | 'declined') => {
+    if (closedRef.current) return;
+    closedRef.current = true;
+
+    if (conversationId && channelName) {
+      try { await signalCall(conversationId, 'ended', channelName); } catch {}
+      dispatch(messegeSendRequest({
+        conversationId,
+        messageType: 'call',
+        callType,
+        callStatus,
+        duration: 0,
+      }));
+    }
+    dispatch(endCall());
+  };
 
   useEffect(() => {
     const pulse = Animated.loop(
@@ -23,6 +42,13 @@ export default function OutgoingCallScreen() {
     pulse.start();
     return () => pulse.stop();
   }, []);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      finishOutgoing('missed');
+    }, 45_000);
+    return () => clearTimeout(timeout);
+  }, [conversationId, channelName, callType]);
 
   useEffect(() => {
     console.log('[OutgoingCall] conversationId:', conversationId, 'channelName:', channelName);
@@ -52,16 +78,19 @@ export default function OutgoingCallScreen() {
 
     const onAccepted = (data: any) => {
       console.log('[OutgoingCall] call_accepted received, data:', JSON.stringify(data), 'expected channelName:', channelName);
+      closedRef.current = true;
       dispatch(callConnected());
     };
 
     const onDeclined = (data: any) => {
       console.log('[OutgoingCall] call_declined received, data:', JSON.stringify(data), 'expected channelName:', channelName);
+      closedRef.current = true;
       dispatch(endCall());
     };
 
     const onEnded = (data: any) => {
       console.log('[OutgoingCall] call_ended received:', JSON.stringify(data));
+      closedRef.current = true;
       dispatch(endCall());
     };
 
@@ -107,7 +136,7 @@ export default function OutgoingCallScreen() {
 
         <Text style={styles.name}>{name}</Text>
 
-        <TouchableOpacity style={styles.endBtn} onPress={() => dispatch(endCall())}>
+        <TouchableOpacity style={styles.endBtn} onPress={() => finishOutgoing('declined')}>
           <FontAwesome6 name="phone-slash" iconStyle="solid" size={normalize(28)} color="#fff" />
         </TouchableOpacity>
       </SafeAreaView>

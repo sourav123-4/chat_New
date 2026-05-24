@@ -2,7 +2,6 @@ import { AxiosResponse } from 'axios';
 import { call, put, takeLatest } from 'redux-saga/effects';
 import { instance } from '../../utils/server/instance';
 import { API } from '../../utils/constants';
-import { chatCreateFailure, chatCreateSuccess, chatListFailure, chatListSuccess } from '../slice/chat.slice';
 import { show } from '../../components/Toast';
 import { messegeListFailure, messegeListSuccess, messegeSendFailure, messegeSendSuccess } from '../slice/messege.slice';
 
@@ -46,11 +45,17 @@ function* handleMessegeListRequest(action: any) {
 
 function* handleMessegeSendRequest(action: any) {
   try {
+    const isFormData =
+      typeof FormData !== 'undefined' && action.payload instanceof FormData;
+    const config = isFormData
+      ? { headers: { "Content-Type": "multipart/form-data" } }
+      : undefined;
+
     const result: AxiosResponse<any> = yield call(
       instance.post,
       API.messege.messegecreate,
       action.payload,
-      { headers: { "Content-Type": "multipart/form-data" } }
+      config
     );
 
     if (result?.status === 200) {
@@ -68,12 +73,17 @@ function* handleMessegeSendRequest(action: any) {
     }
     // show(result?.data?.message);
   } catch (error: any) {
+    const message =
+      error?.response?.data?.message ||
+      error?.response?.data?.error ||
+      error?.message ||
+      'Message send failed';
     yield put(
       messegeSendFailure({
         response: error?.response?.data,
       }),
     );
-    // show(error?.response?.data?.message);
+    yield call(show, message, 2000, 'top');
   }
 }
 

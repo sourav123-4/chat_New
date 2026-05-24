@@ -46,7 +46,14 @@ const chatSlice = createSlice({
     },
 
 
-    chatCreateRequest(state) {
+    chatCreateRequest(
+      state,
+      _action: PayloadAction<{
+        participants: string[];
+        isGroup: boolean;
+        groupName?: string;
+      }>
+    ) {
       state.loading = true;
       state.status = "chat/chatListRequest";
     },

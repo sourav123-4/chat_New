@@ -5,8 +5,26 @@ import { normalize } from '../../utils/orientation';
 interface StatusBarProps {
   isTyping: boolean;
   isOnline: boolean;
-  lastSeen: number | null;
+  lastSeen: string | number | null;
 }
+
+const formatLastSeen = (value: string | number) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'offline';
+  const now = new Date();
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (sameDay) return `last seen today at ${time}`;
+  const day = date.toLocaleDateString([], {
+    day: 'numeric',
+    month: 'short',
+    year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric',
+  });
+  return `last seen ${day} at ${time}`;
+};
 
 export const StatusBar: React.FC<StatusBarProps> = ({
   isTyping,
@@ -17,10 +35,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     if (isTyping) return 'typing...';
     if (isOnline) return 'online';
     if (lastSeen) {
-      return `last seen ${new Date(lastSeen).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      })}`;
+      return formatLastSeen(lastSeen);
     }
     return 'offline';
   };

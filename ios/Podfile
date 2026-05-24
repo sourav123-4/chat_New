@@ -17,7 +17,7 @@ end
 target 'ChatAppNew' do
   config = use_native_modules!
 
-  # ✅ Fix only Firebase dependency (NOT global)
+  # Fix only Firebase dependency (NOT global)
   pod 'GoogleUtilities', :modular_headers => true
 
   use_react_native!(
@@ -26,10 +26,49 @@ target 'ChatAppNew' do
   )
 
   post_install do |installer|
+    set_xcconfig_value = lambda do |path, key, value|
+      next unless File.exist?(path)
+
+      text = File.read(path)
+      setting = "#{key} = #{value}"
+      if text.match?(/^#{Regexp.escape(key)}\s*=/)
+        text = text.gsub(/^#{Regexp.escape(key)}\s*=.*$/, setting)
+      else
+        text = "#{text.rstrip}\n#{setting}\n"
+      end
+      File.write(path, text)
+    end
+
     react_native_post_install(
       installer,
       config[:reactNativePath],
       :mac_catalyst_enabled => false
     )
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version_supported
+
+        if target.name == 'MMKVCore'
+          config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++20'
+          config.build_settings['CLANG_CXX_LIBRARY'] = 'libc++'
+        elsif target.name == 'fmt'
+          config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+        end
+      end
+    end
+
+    pods_root = Pod::Config.instance.installation_root.to_s
+    ['debug', 'release'].each do |configuration|
+      set_xcconfig_value.call(
+        File.join(pods_root, 'Pods', 'Target Support Files', 'MMKVCore', "MMKVCore.#{configuration}.xcconfig"),
+        'CLANG_CXX_LANGUAGE_STANDARD',
+        'gnu++20'
+      )
+      set_xcconfig_value.call(
+        File.join(pods_root, 'Pods', 'Target Support Files', 'fmt', "fmt.#{configuration}.xcconfig"),
+        'CLANG_CXX_LANGUAGE_STANDARD',
+        'c++17'
+      )
+    end
   end
 end

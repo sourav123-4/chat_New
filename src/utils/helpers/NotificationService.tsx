@@ -3,18 +3,31 @@ import notifee, {
   AndroidImportance,
   AndroidCategory,
   AndroidVisibility,
+  AndroidDefaults,
+  AndroidFlags,
+  AndroidLaunchActivityFlag,
   EventType,
 } from '@notifee/react-native';
 import { store } from '../../store';
 import { receiveIncomingCall, endCall } from '../../store/slice/call.slice';
-import { signalCall, extractConversationId, markMessagesRead } from './socket';
+import { signalCall, extractConversationId, markMessagesRead, getStoredAuthToken, getStoredUserId } from './socket';
+import { Platform } from 'react-native';
 import { BASE_URL } from '@env';
+import { saveMessage } from '../../db/messageRepository';
+import { clearUnread, updateChatLastMessage, updateChatReadStatus } from '../../db/mmkv';
 
 const CH_MSG     = 'messages';
 const CH_CALL    = 'incoming_call';
 const CH_ONGOING = 'ongoing_call';
 const ID_CALL    = 'incoming_call';
 const ID_ONGOING = 'ongoing_call';
+let backgroundHandlerRegistered = false;
+
+const callActivityFlags = [
+  AndroidLaunchActivityFlag.NEW_TASK,
+  AndroidLaunchActivityFlag.SINGLE_TOP,
+  AndroidLaunchActivityFlag.NO_USER_ACTION,
+];
 
 // ── Create channels ───────────────────────────────────────────────
 export const createChannels = async () => {
@@ -34,8 +47,9 @@ export const createChannels = async () => {
     id: CH_CALL,
     name: 'Incoming Calls',
     importance: AndroidImportance.HIGH,
-    sound: '',
-    vibration: false,
+    vibration: true,
+    vibrationPattern: [0, 900, 500, 900],
+    lights: true,
   });
 
   await notifee.createChannel({
@@ -61,6 +75,29 @@ export const requestNotificationPermission = async () => {
 export const getFcmToken = async (): Promise<string | null> => {
   try { return await messaging().getToken(); }
   catch (e) { console.log('[NS] FCM token error:', e); return null; }
+};
+
+export const registerDeviceToken = async (deviceToken: string | null) => {
+  if (!deviceToken) return;
+  const token = store.getState().auth.token;
+  if (!token) return;
+
+  try {
+    await fetch(`${BASE_URL}/api/notification/register-token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ deviceToken, deviceType: Platform.OS }),
+    });
+  } catch (e) {
+    console.log('[NS] registerDeviceToken error:', e);
+  }
+};
+
+export const listenFcmTokenRefresh = (callback: (token: string) => void) => {
+  return messaging().onTokenRefresh(callback);
 };
 
 // ── Message notification with Reply + Mark as Read ────────────────
@@ -113,15 +150,21 @@ const showIncomingCallNotification = async (data: any) => {
       smallIcon: 'ic_launcher',
       ongoing: true,
       onlyAlertOnce: false,
-      // fullScreenAction launches IncomingCallActivity
-      // IncomingCallActivity handles ALL ringing/vibration
+      autoCancel: false,
+      defaults: [AndroidDefaults.SOUND, AndroidDefaults.VIBRATE, AndroidDefaults.LIGHTS],
+      flags: [AndroidFlags.FLAG_INSISTENT, AndroidFlags.FLAG_NO_CLEAR],
+      timeoutAfter: 45000,
+      vibrationPattern: [0, 900, 500, 900],
+      lights: ['#22C55E', 300, 600],
       fullScreenAction: {
         id: 'default',
         launchActivity: 'com.chatappnew.IncomingCallActivity',
+        launchActivityFlags: callActivityFlags,
       },
       pressAction: {
         id: 'default',
         launchActivity: 'com.chatappnew.IncomingCallActivity',
+        launchActivityFlags: callActivityFlags,
       },
       actions: [
         {
@@ -129,6 +172,7 @@ const showIncomingCallNotification = async (data: any) => {
           pressAction: {
             id: 'accept',
             launchActivity: 'com.chatappnew.IncomingCallActivity',
+            launchActivityFlags: callActivityFlags,
           },
         },
         {
@@ -195,9 +239,9 @@ export const dispatchIncomingCall = (data: any, autoAccepted = false) => {
 
 // ── Send reply message via API ────────────────────────────────────
 const sendReplyMessage = async (conversationId: string, text: string) => {
-  const token = store.getState().auth.token;
+  const token = await getStoredAuthToken();
   try {
-    await fetch(`${BASE_URL}/api/messages`, {
+    const res = await fetch(`${BASE_URL}/api/messages/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -205,8 +249,12 @@ const sendReplyMessage = async (conversationId: string, text: string) => {
       },
       body: JSON.stringify({ conversationId, text }),
     });
+    if (!res.ok) return null;
+    const payload = await res.json();
+    return payload?.message ?? null;
   } catch (e) {
     console.log('[NS] sendReply error:', e);
+    return null;
   }
 };
 
@@ -257,7 +305,15 @@ const handleAction = async (
     data?.conversationId || extractConversationId(data?.channelName ?? '');
 
   if (actionId === 'reply' && data?.conversationId && inputText) {
-    await sendReplyMessage(data.conversationId, inputText);
+    const sentMessage = await sendReplyMessage(data.conversationId, inputText);
+    if (sentMessage) {
+      const userId = await getStoredUserId();
+      await saveMessage(sentMessage);
+      updateChatLastMessage(data.conversationId, sentMessage);
+      clearUnread(data.conversationId);
+      await markMessagesRead(data.conversationId);
+      updateChatReadStatus(data.conversationId, userId);
+    }
     // Update notification to show reply was sent
     await notifee.displayNotification({
       id: notifId || 'msg',
@@ -272,7 +328,10 @@ const handleAction = async (
     });
 
   } else if (actionId === 'mark_read' && data?.conversationId) {
+    const userId = await getStoredUserId();
     await markMessagesRead(data.conversationId);
+    clearUnread(data.conversationId);
+    updateChatReadStatus(data.conversationId, userId);
     if (notifId) await notifee.cancelNotification(notifId).catch(() => {});
 
   } else if (actionId === 'accept' && data) {
@@ -303,8 +362,21 @@ const handleAction = async (
 
 // ── Background handler ────────────────────────────────────────────
 export const registerBackgroundHandler = () => {
+  if (backgroundHandlerRegistered) return;
+  backgroundHandlerRegistered = true;
+
   messaging().setBackgroundMessageHandler(async remoteMessage => {
-    await handleIncomingCallData(remoteMessage.data, false);
+    const handled = await handleIncomingCallData(remoteMessage.data, false);
+    if (handled) return;
+    await showMessageNotification(
+      (remoteMessage.data?.title as string) ||
+        remoteMessage.notification?.title ||
+        'New Message',
+      (remoteMessage.data?.body as string) ||
+        remoteMessage.notification?.body ||
+        '',
+      remoteMessage.data,
+    );
   });
 
   notifee.onBackgroundEvent(async ({ type, detail }) => {

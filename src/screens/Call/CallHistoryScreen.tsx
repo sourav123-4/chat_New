@@ -87,8 +87,8 @@ export default function CallHistoryScreen() {
     const dirIcon = isBad
       ? 'phone-slash'
       : direction === 'outgoing'
-      ? 'phone-arrow-up-right'
-      : 'phone-arrow-down-left';
+      ? 'arrow-up-right-from-square'
+      : 'arrow-down';
     const label = isMissed
       ? 'Missed'
       : isDeclined
@@ -111,7 +111,7 @@ export default function CallHistoryScreen() {
         <View style={styles.info}>
           <Text style={styles.name}>{person?.name ?? 'Unknown'}</Text>
           <View style={styles.subRow}>
-            <FontAwesome6 name={dirIcon} iconStyle="solid" size={normalize(11)} color={iconColor} />
+            <FontAwesome6 name={dirIcon as any} iconStyle="solid" size={normalize(11)} color={iconColor} />
             <Text style={[styles.sub, { color: isBad ? '#EF4444' : '#666' }]}>
               {'  '}{label}{formatDuration(item.duration)}
             </Text>

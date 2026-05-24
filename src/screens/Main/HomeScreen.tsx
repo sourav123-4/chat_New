@@ -23,6 +23,10 @@ type HomeNavProp = NativeStackNavigationProp<AppStackParamList>;
 
 const STALE_MS = 5 * 60 * 1000; // 5 minutes
 
+const getSenderId = (message: any) => (
+  typeof message?.senderId === 'object' ? message.senderId?._id : message?.senderId
+);
+
 export default function HomeScreen({ navigation }: { navigation: HomeNavProp }) {
   const dispatch = useAppDispatch();
   const isFocused = useIsFocused();
@@ -104,15 +108,23 @@ export default function HomeScreen({ navigation }: { navigation: HomeNavProp }) 
     // Move chat to top in UI
     setChats((prev) => {
       const idx = prev.findIndex((c: any) => c._id === conversationId);
-      if (idx <= 0) return prev;
       const updated = [...prev];
+      if (idx === -1) return prev;
       const [chat] = updated.splice(idx, 1);
-      return [chat, ...updated];
+      const nextChat = {
+        ...chat,
+        lastMessage: message,
+        lastMessageAt: message.createdAt,
+        lastMessageSenderId: getSenderId(message),
+        lastMessageStatus: message.status ?? chat.lastMessageStatus ?? 'sent',
+      };
+      return [nextChat, ...updated];
     });
   }, []);
 
   const { typingChats, rtReadChats } = useHomeSocket({
     userId, chatIds,
+    active: isFocused,
     onUserOnline: handleUserOnline,
     onUserOffline: handleUserOffline,
     onNewMessage: handleNewMessage,
@@ -154,7 +166,8 @@ export default function HomeScreen({ navigation }: { navigation: HomeNavProp }) 
     const lastMsg = rt?.lastMessage ?? item.lastMessage;
     // unreadCount: realtime override OR from MMKV
     const unreadCount = rt?.unreadCount ?? getUnreadCount(item._id);
-    const isMe = item.lastMessageSenderId === userId;
+    const lastMessageSenderId = getSenderId(lastMsg) ?? item.lastMessageSenderId;
+    const isMe = lastMessageSenderId === userId;
     const msgStatus = rtReadChats[item._id] ?? (rt?.lastMessage?.status ?? item.lastMessageStatus);
     const lastMsgTime = (lastMsg?.createdAt ?? item.lastMessageAt)
       ? new Date(lastMsg?.createdAt ?? item.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { connectPusher, getChannel, releaseChannel, markMessagesRead } from '../helpers/socket';
+import { getChannel, releaseChannel, markMessagesRead } from '../helpers/socket';
 
 interface UseSocketProps {
   userId: string;
@@ -70,6 +70,7 @@ export const useSocket = ({
     convChannel.bind('message_received', onMsgReceived);
     convChannel.bind('message_delivered', onMsgDelivered);
     convChannel.bind('client-message_read', onMsgRead);
+    convChannel.bind('messages_read_bulk', onMsgRead);
 
     // ── Typing ────────────────────────────────────────────────────
     const onTypingEvt = (d: any) => {
@@ -98,6 +99,7 @@ export const useSocket = ({
       convChannel.unbind('message_received', onMsgReceived);
       convChannel.unbind('message_delivered', onMsgDelivered);
       convChannel.unbind('client-message_read', onMsgRead);
+      convChannel.unbind('messages_read_bulk', onMsgRead);
       convChannel.unbind('client-typing', onTypingEvt);
       convChannel.unbind('client-stop_typing', onStopTypingEvt);
       releaseChannel(convName);

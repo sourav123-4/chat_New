@@ -1,7 +1,7 @@
-import { View, Text, Animated, Easing, StyleSheet } from 'react-native';
+import { View, Text, Animated, Easing, StyleSheet, ActivityIndicator } from 'react-native';
 import React, { FC, useEffect, useRef } from 'react';
 import { normalize } from '../orientation';
-import { Colors, Fonts, Icons } from '@app/themes';
+import { Colors, Fonts } from '../../themes';
 
 type FooterLoaderProps = {
   visible: boolean;
@@ -59,10 +59,9 @@ const FooterLoader: FC<FooterLoaderProps> = ({
   return (
     <View style={styles.loadingContainer}>
       <Text style={styles.loadingText}>{title}</Text>
-      <Animated.Image
-        source={Icons.app_badging}
-        style={[styles.loadingImage, { transform: [{ rotate: spin }] }]}
-      />
+      <Animated.View style={{ transform: [{ rotate: spin }] }}>
+        <ActivityIndicator size="small" color={Colors.night_blue} />
+      </Animated.View>
     </View>
   );
 };
@@ -81,9 +80,5 @@ const styles = StyleSheet.create({
     fontSize: normalize(11),
     fontFamily: Fonts.Inter_Regular,
     marginRight: normalize(6), // Added margin to separate text and spinner
-  },
-  loadingImage: {
-    width: normalize(15),
-    height: normalize(15),
   },
 });

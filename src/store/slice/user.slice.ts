@@ -45,7 +45,7 @@ const userSlice = createSlice({
       state.profileDetailsResponse = action.payload?.response;
     },
 
-    updateProfileRequest(state) {
+    updateProfileRequest(state, _action: PayloadAction<FormData>) {
       state.loading = true;
       state.status = "user/updateProfileRequest";
     },
@@ -56,12 +56,12 @@ const userSlice = createSlice({
       state.profileDetailsResponse = action.payload.response;
     },
 
-    updateProfileFailure(state) {
+    updateProfileFailure(state, _action: PayloadAction<ApiResponse>) {
       state.loading = false;
       state.status = "user/updateProfileFailure";
     },
 
-    getSearchedUserRequest(state) {
+    getSearchedUserRequest(state, _action: PayloadAction<{ query: string }>) {
       state.loading = true;
       state.status = "user/getSearchedUserRequest";
     },
@@ -72,7 +72,7 @@ const userSlice = createSlice({
       state.searchedUserResponse = action.payload.response;
     },
 
-    getSearchedUserFailure(state) {
+    getSearchedUserFailure(state, _action: PayloadAction<ApiResponse>) {
       state.loading = false;
       state.status = "user/getSearchedUserFailure";
     },

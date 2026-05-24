@@ -16,6 +16,8 @@ import {
   getInitialNotification,
   dispatchIncomingCall,
   cancelIncomingCallNotification,
+  registerDeviceToken,
+  listenFcmTokenRefresh,
 } from "./src/utils/helpers/NotificationService";
 import {
   signalCall,
@@ -30,7 +32,7 @@ import CallOverlay from "./src/components/CallOverlay";
 import { setupCallKeep } from "./src/utils/helpers/CallKeepService";
 
 function Routes() {
-  const { token } = useAppSelector(state => state.auth);
+  const { token, device_token } = useAppSelector(state => state.auth);
   const appState = useRef(AppState.currentState);
 
   useEffect(() => {
@@ -43,11 +45,18 @@ function Routes() {
     const setup = async () => {
       await initNotification();
       const fcmToken = await getFcmToken();
-      if (fcmToken) store.dispatch(setDeviceToken(fcmToken));
+      if (fcmToken) {
+        store.dispatch(setDeviceToken(fcmToken));
+        await registerDeviceToken(fcmToken);
+      }
     };
     setup();
 
     const unsubscribeForeground = listenForegroundNotification();
+    const unsubscribeTokenRefresh = listenFcmTokenRefresh(fcmToken => {
+      store.dispatch(setDeviceToken(fcmToken));
+      registerDeviceToken(fcmToken);
+    });
 
     // Handle accept/decline from native IncomingCallActivity
     // This fires when app is in background OR killed (via onResume flush)
@@ -102,9 +111,16 @@ function Routes() {
 
     return () => {
       unsubscribeForeground();
+      unsubscribeTokenRefresh();
       callActionSub.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (token && device_token) {
+      registerDeviceToken(device_token);
+    }
+  }, [token, device_token]);
 
   useEffect(() => {
     if (!token) return;

@@ -2,7 +2,7 @@ import axios from 'axios';
 import NetInfo from '@react-native-community/netinfo';
 import { API, URL_LIST } from '../constants';
 import { store } from '../../store';
-// import { setTokenRefreshToken, logoutRequest } from '../../store/authSlice';
+import { setTokenRefreshToken } from '../../store/slice/auth.slice';
 
 export const instance = axios.create({
   baseURL: URL_LIST.api_base_url,
@@ -20,18 +20,16 @@ const refreshTokenApiCall = async () => {
 
   try {
     const response = await axios.post(
-      `${URL_LIST.api_base_url}/${auth.refreshToken}`,
+      `${URL_LIST.api_base_url}${auth.refreshToken}`,
       { refreshToken }
     );
 
-    // store.dispatch(
-    //   setTokenRefreshToken({
-    //     token: response.data.accessToken,
-    //     refreshToken: response.data.refreshToken,
-    //   })
-    // );
+    const token = response.data?.token;
+    if (token) {
+      store.dispatch(setTokenRefreshToken({ token, refreshToken }));
+    }
 
-    return response.data.accessToken;
+    return token ?? null;
   } catch (error) {
     // store.dispatch(logoutRequest({}));
     throw error;

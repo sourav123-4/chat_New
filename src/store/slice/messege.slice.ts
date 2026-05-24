@@ -58,7 +58,7 @@ const messegeSlice = createSlice({
       state.messegeListResponse = action.payload?.response;
     },
 
-    messegeSendRequest(state, action: PayloadAction<any>) {
+    messegeSendRequest(state, _action: PayloadAction<any>) {
       state.status = "messege/messegeSendRequest";
     },
 

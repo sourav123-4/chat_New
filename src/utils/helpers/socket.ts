@@ -1,16 +1,51 @@
-import Pusher, { Channel } from 'pusher-js';
+import PusherModule from 'pusher-js/react-native';
+import type PusherType from 'pusher-js';
+import type { Channel } from 'pusher-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { store } from '../../store';
 import { PUSHER_APP_KEY, PUSHER_CLUSTER, BASE_URL } from '@env';
 
-let pusher: Pusher | null = null;
+const PusherClient = ((PusherModule as any).Pusher ?? PusherModule) as typeof PusherType;
+
+let pusher: PusherType | null = null;
 
 // Track how many components are using each channel
 const channelRefs: Record<string, number> = {};
 
-export const connectPusher = (): Pusher => {
+export const getStoredAuthToken = async (): Promise<string> => {
+  const stateToken = store.getState().auth.token;
+  if (stateToken) return stateToken;
+
+  try {
+    const persisted = await AsyncStorage.getItem('persist:root');
+    if (!persisted) return '';
+    const root = JSON.parse(persisted);
+    const auth = root?.auth ? JSON.parse(root.auth) : null;
+    return auth?.token ?? '';
+  } catch {
+    return '';
+  }
+};
+
+export const getStoredUserId = async (): Promise<string> => {
+  const stateUserId = store.getState().auth.userId;
+  if (stateUserId) return stateUserId;
+
+  try {
+    const persisted = await AsyncStorage.getItem('persist:root');
+    if (!persisted) return '';
+    const root = JSON.parse(persisted);
+    const auth = root?.auth ? JSON.parse(root.auth) : null;
+    return auth?.userId ?? '';
+  } catch {
+    return '';
+  }
+};
+
+export const connectPusher = (): PusherType => {
   if (pusher) return pusher;
   const token = store.getState().auth.token;
-  pusher = new Pusher(PUSHER_APP_KEY, {
+  pusher = new PusherClient(PUSHER_APP_KEY, {
     cluster: PUSHER_CLUSTER,
     authEndpoint: `${BASE_URL}/api/pusher/auth`,
     auth: { headers: { Authorization: `Bearer ${token}` } },
@@ -40,8 +75,8 @@ export const releaseChannel = (name: string) => {
   }
 };
 
-const apiCall = (path: string, body: object = {}) => {
-  const token = store.getState().auth.token;
+const apiCall = async (path: string, body: object = {}) => {
+  const token = await getStoredAuthToken();
   return fetch(`${BASE_URL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

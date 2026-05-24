@@ -7,7 +7,7 @@
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
-    "test": "jest"
+    "test": "NODE_OPTIONS=--no-webstorage jest --watchman=false --forceExit"
   },
   "dependencies": {
     "@notifee/react-native": "^9.1.8",

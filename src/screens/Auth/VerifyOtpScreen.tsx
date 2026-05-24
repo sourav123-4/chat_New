@@ -69,7 +69,7 @@ export default function VerifyOtpScreen({ navigation, route }: Props) {
 
   // Resend timer
   useEffect(() => {
-    let interval: NodeJS.Timeout | undefined;
+    let interval: ReturnType<typeof setInterval> | undefined;
 
     if (resendTimer > 0) {
       interval = setInterval(() => {

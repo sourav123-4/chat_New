@@ -1,4 +1,4 @@
-import Colors from '@app/themes/Colors';
+import Colors from '../../themes/Colors';
 import React from 'react';
 import {
   StatusBar,

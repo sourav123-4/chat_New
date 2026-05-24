@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getChannel, releaseChannel } from '../helpers/socket';
+import { updateChatReadStatus } from '../../db/mmkv';
 
 interface UseHomeSocketProps {
   userId: string;
@@ -7,6 +8,7 @@ interface UseHomeSocketProps {
   onUserOnline: (userId: string) => void;
   onUserOffline: (userId: string) => void;
   onNewMessage: (conversationId: string, message: any) => void;
+  active?: boolean;
 }
 
 // Exposed so HomeScreen can read typing state per conversation
@@ -16,6 +18,7 @@ export const useHomeSocket = ({
   onUserOnline,
   onUserOffline,
   onNewMessage,
+  active = true,
 }: UseHomeSocketProps) => {
   const r = useRef({ onUserOnline, onUserOffline, onNewMessage });
   useEffect(() => { r.current = { onUserOnline, onUserOffline, onNewMessage }; });
@@ -26,7 +29,7 @@ export const useHomeSocket = ({
   const [rtReadChats, setRtReadChats] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (!userId || chatIds.length === 0) return;
+    if (!active || !userId || chatIds.length === 0) return;
 
     // ── presence-global: online/offline ──────────────────────────
     const globalName = 'presence-global';
@@ -37,7 +40,14 @@ export const useHomeSocket = ({
     globalChannel.bind('user_offline', onOffline);
 
     // ── per-conversation: messages + typing ──────────────────────
-    const convBindings: { name: string; ch: any; msgHandler: any; typingHandler: any; stopTypingHandler: any; readHandler: any }[] = [];
+    const convBindings: {
+      name: string;
+      ch: any;
+      msgHandler: any;
+      typingHandler: any;
+      stopTypingHandler: any;
+      readHandler: any;
+    }[] = [];
 
     chatIds.forEach((chatId) => {
       const name = `private-conversation-${chatId}`;
@@ -62,6 +72,7 @@ export const useHomeSocket = ({
       // client-message_read: other user read our messages — update lastMessageStatus instantly
       const readHandler = (d: any) => {
         if (d?.userId === userId) return;
+        updateChatReadStatus(chatId, d?.userId);
         setRtReadChats((prev) => ({ ...prev, [chatId]: 'read' }));
       };
 
@@ -69,6 +80,7 @@ export const useHomeSocket = ({
       ch.bind('client-typing', typingHandler);
       ch.bind('client-stop_typing', stopTypingHandler);
       ch.bind('client-message_read', readHandler);
+      ch.bind('messages_read_bulk', readHandler);
 
       convBindings.push({ name, ch, msgHandler, typingHandler, stopTypingHandler, readHandler });
     });
@@ -83,10 +95,11 @@ export const useHomeSocket = ({
         ch.unbind('client-typing', typingHandler);
         ch.unbind('client-stop_typing', stopTypingHandler);
         ch.unbind('client-message_read', readHandler);
+        ch.unbind('messages_read_bulk', readHandler);
         releaseChannel(name);
       });
     };
-  }, [userId, chatIds.join(',')]);
+  }, [active, userId, chatIds.join(',')]);
 
   return { typingChats, rtReadChats };
 };

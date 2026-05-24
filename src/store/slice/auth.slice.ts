@@ -43,7 +43,7 @@ const authSlice = createSlice({
       state.refreshToken = action.payload.refreshToken;
     },
 
-    signInRequest(state) {
+    signInRequest(state, _action: PayloadAction<{ email: string; password: string }>) {
       state.loading = true;
       state.status = "auth/signInRequest";
     },
@@ -66,7 +66,7 @@ const authSlice = createSlice({
       state.signinResponse = action.payload?.response ?? {};
     },
 
-    signUpRequest(state) {
+    signUpRequest(state, _action: PayloadAction<FormData>) {
       state.loading = true;
       state.status = "auth/signUpRequest";
     },
@@ -89,67 +89,73 @@ const authSlice = createSlice({
       state.signUpResponse = action.payload?.response ?? {};
     },
 
-    forgotPasswordRequest(state) {
+    forgotPasswordRequest(state, _action: PayloadAction<{ email: string }>) {
       state.loading = true;
       state.status = "auth/forgotPasswordRequest";
     },
 
-    forgotPasswordSuccess(state, action: PayloadAction<ApiResponse>) {
+    forgotPasswordSuccess(state, _action: PayloadAction<ApiResponse>) {
       state.loading = false;
       state.status = "auth/forgotPasswordSuccess";
     },
 
-    forgotPasswordFailure(state, action: PayloadAction<ApiResponse>) {
+    forgotPasswordFailure(state, _action: PayloadAction<ApiResponse>) {
       state.loading = false;
       state.status = "auth/forgotPasswordFailure";
     },
 
-    verifyOtpRequest(state) {
+    verifyOtpRequest(state, _action: PayloadAction<{ email: string; otp: string }>) {
       state.loading = true;
       state.status = "auth/verifyOtpRequest";
     },
 
-    verifyOtpSuccess(state, action: PayloadAction<ApiResponse>) {
+    verifyOtpSuccess(state, _action: PayloadAction<ApiResponse>) {
       state.loading = false;
       state.status = "auth/verifyOtpSuccess";
     },
 
-    verifyOtpFailure(state, action: PayloadAction<ApiResponse>) {
+    verifyOtpFailure(state, _action: PayloadAction<ApiResponse>) {
       state.loading = false;
       state.status = "auth/verifyOtpFailure";
     },
 
-    resetPasswordRequest(state) {
+    resetPasswordRequest(
+      state,
+      _action: PayloadAction<{ email: string; otp: string; newPassword: string }>
+    ) {
       state.loading = true;
       state.status = "auth/resetPasswordRequest";
     },
 
-    resetPasswordSuccess(state, action: PayloadAction<ApiResponse>) {
+    resetPasswordSuccess(state, _action: PayloadAction<ApiResponse>) {
       state.loading = false;
       state.status = "auth/resetPasswordSuccess";
     },
 
-    resetPasswordFailure(state, action: PayloadAction<ApiResponse>) {
+    resetPasswordFailure(state, _action: PayloadAction<ApiResponse>) {
       state.loading = false;
       state.status = "auth/resetPasswordFailure";
     },
 
-    changePasswordRequest(state) {
+    changePasswordRequest(
+      state,
+      _action: PayloadAction<{ oldPassword: string; newPassword: string }>
+    ) {
       state.loading = true;
       state.status = "auth/changePasswordRequest";
     },
 
-    changePasswordSuccess(state, action: PayloadAction<ApiResponse>) {
+    changePasswordSuccess(state, _action: PayloadAction<ApiResponse>) {
       state.loading = false;
       state.status = "auth/changePasswordSuccess";
     },
 
-    changePasswordFailure(state, action: PayloadAction<ApiResponse>) {
+    changePasswordFailure(state, _action: PayloadAction<ApiResponse>) {
       state.loading = false;
       state.status = "auth/changePasswordFailure";
     },
 
-    googleSignInRequest(state) {
+    googleSignInRequest(state, _action: PayloadAction<{ token?: string | null }>) {
       state.loading = true;
       state.status = "auth/googleSignInRequest";
     },

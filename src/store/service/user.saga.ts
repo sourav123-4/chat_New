@@ -94,6 +94,6 @@ function* handleGetUsers(action: any) {
 
 export default function* userSaga() {
   yield takeLatest("user/profileDetailsRequest", handleProfileDetails);
-  yield takeLatest("user/updateProfileRequest", handleUpdateProfile);
+  yield takeLatest("user/updateProfileRequest", handleUpdateProfile as any);
   yield takeLatest("user/getSearchedUserRequest", handleGetUsers);
 }

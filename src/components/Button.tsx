@@ -16,6 +16,7 @@ interface ButtonProps {
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
   variant?: "primary" | "secondary" | "outline";
+  disabled?: boolean;
 }
 
 export default function Button({
@@ -23,6 +24,7 @@ export default function Button({
   onPress,
   style,
   variant = "primary",
+  disabled = false,
 }: ButtonProps) {
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -48,6 +50,7 @@ export default function Button({
     <Animated.View style={{ transform: [{ scale }] }}>
       <TouchableOpacity
         activeOpacity={0.9}
+        disabled={disabled}
         onPressIn={pressIn}
         onPressOut={pressOut}
         onPress={onPress}
@@ -56,6 +59,7 @@ export default function Button({
           variant === "primary" && styles.primary,
           variant === "secondary" && styles.secondary,
           variant === "outline" && styles.outline,
+          disabled && styles.disabled,
           style,
         ]}
       >
@@ -91,6 +95,9 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
     borderWidth: 1,
     borderColor: "#6A11CB",
+  },
+  disabled: {
+    opacity: 0.55,
   },
 
   text: {

@@ -54,7 +54,7 @@ export class WebRTCService {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
-      },
+      } as any,
       video: this.isVideo
         ? { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }
         : false,
@@ -74,7 +74,9 @@ export class WebRTCService {
     });
 
     // Remote stream handler
-    this.pc.ontrack = (event: any) => {
+    const peerConnection = this.pc as any;
+
+    peerConnection.ontrack = (event: any) => {
       if (event.streams?.[0]) {
         console.log('[WebRTC] remote stream received');
         this.callbacks.onRemoteStream(event.streams[0]);
@@ -82,18 +84,18 @@ export class WebRTCService {
     };
 
     // ICE candidates
-    this.pc.onicecandidate = (event: any) => {
+    peerConnection.onicecandidate = (event: any) => {
       if (event.candidate) {
         this.sendSignal('ice-candidate', { candidate: event.candidate });
       }
     };
 
-    this.pc.oniceconnectionstatechange = () => {
+    peerConnection.oniceconnectionstatechange = () => {
       console.log('[WebRTC] ICE state:', this.pc?.iceConnectionState);
     };
 
-    this.pc.onconnectionstatechange = () => {
-      const state = this.pc?.connectionState;
+    peerConnection.onconnectionstatechange = () => {
+      const state = peerConnection.connectionState;
       console.log('[WebRTC] connection state:', state);
       if (!this.stopped && (state === 'disconnected' || state === 'failed' || state === 'closed')) {
         this.callbacks.onCallEnded();

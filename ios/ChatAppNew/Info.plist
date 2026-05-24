@@ -36,7 +36,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Camera access is needed for video calls and profile photos.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>Location access is used to support location-based chat features when you choose to use them.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Microphone access is needed for audio and video calls.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
@@ -59,8 +59,12 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+		<string>UIInterfaceOrientationPortrait</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
